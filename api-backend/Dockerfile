@@ -13,7 +13,7 @@ RUN go mod download
 RUN go build -o ./api ./main.go
 
 # Expose the port
-EXPOSE 8080
+EXPOSE 80
 
 # Run the API backend
 CMD ["./app/api"]

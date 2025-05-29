@@ -1,3 +1,5 @@
+LOCAL_PORT = 3000
+
 # Load extensions
 load('ext://restart_process', 'docker_build_with_restart')
 load('ext://uibutton', 'cmd_button', 'text_input')
@@ -31,7 +33,10 @@ docker_build(
     live_update=[
         sync('./frontend', '/app')
     ],
-    build_args={'DEV': 'true'}
+    build_args={
+        'DEV': 'true',
+        'BASE_URL': 'http://localhost:%d' % LOCAL_PORT
+    },
 )
 
 # -> Reinstall package dependencies
@@ -61,6 +66,17 @@ cmd_button(
 k8s_yaml('k8s/api-backend-deployment.yaml')
 k8s_yaml('k8s/frontend-deployment.yaml')
 
-# Configure port forwarding
-k8s_resource('gradewise-api-backend', port_forwards='8080:8080') 
-k8s_resource('gradewise-frontend', port_forwards='3000:3000')
+## Traefik
+k8s_yaml('k8s/traefik/role.yml')
+k8s_yaml('k8s/traefik/account.yml')
+k8s_yaml('k8s/traefik/role-binding.yml')
+k8s_yaml('k8s/traefik/traefik.yml')
+k8s_yaml('k8s/traefik/traefik-services.yml')
+
+# Ingress
+k8s_yaml('k8s/traefik/ingress/api-backend.yml')
+k8s_yaml('k8s/traefik/ingress/frontend.yml')
+
+
+# Expose Traefik
+k8s_resource('traefik-deployment', port_forwards=['%d:80' % LOCAL_PORT, '8080:8080'])

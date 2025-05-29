@@ -17,6 +17,12 @@ spec:
       containers:
         - name: gradewise-api-backend
           image: gradewise-api-backend:latest
+          ports:
+            - name: web
+              containerPort: 80
+          env:
+            - name: PORT
+              value: "80"
           resources:
             limits:
               cpu: "1"
@@ -24,11 +30,6 @@ spec:
             requests:
               cpu: "500m"
               memory: "256Mi"
-          ports:
-            - containerPort: 8080
-          env:
-            - name: PORT
-              value: "8080"
 ---
 apiVersion: v1
 kind: Service
@@ -38,6 +39,6 @@ spec:
   selector:
     app: gradewise-api-backend
   ports:
-    - port: 8080
-      targetPort: 8080
-  type: ClusterIP
+    - name: web
+      port: 80
+      targetPort: web

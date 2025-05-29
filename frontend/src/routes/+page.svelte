@@ -1,23 +1,25 @@
 <script lang="ts">
+	import { PUBLIC_BASE_URL } from '$env/static/public';
 	import type { PageProps } from './$types';
-
-	let count = $state(0);
+	import { onMount } from 'svelte';
 
 	let { data }: PageProps = $props();
 
-	import { onMount } from 'svelte';
-
+	let count = $state(0);
 	let healthStatus = $state('Loading...');
 
 	onMount(() => {
-		const interval = setInterval(async () => {
+		const updateHealth = async () => {
 			try {
-				const response = await fetch('http://localhost:8080/health');
+				const response = await fetch(`${PUBLIC_BASE_URL}/api/health`);
 				healthStatus = (await response.text()) + ' - ' + new Date().toLocaleTimeString();
 			} catch (error) {
 				healthStatus = 'Error fetching health status';
 			}
-		}, 1000);
+		};
+
+		updateHealth();
+		const interval = setInterval(updateHealth, 1000);
 
 		return () => clearInterval(interval);
 	});
