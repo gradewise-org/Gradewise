@@ -1,4 +1,5 @@
 LOCAL_PORT = 3000
+DEV = 'true'
 
 # Load extensions
 load('ext://restart_process', 'docker_build_with_restart')
@@ -14,16 +15,31 @@ kubectl exec "$POD_NAME" -- $command
 # API Backend
 docker_build_with_restart(
     'gradewise-api-backend',
-    './api-backend',
+    './backend',
     build_args={
-        'DEV': 'true',
+        'TARGET': 'backend-api',
+        'DEV': DEV,
     },
     live_update=[
         # Sync all source files to the container
-        sync('./api-backend/src', '/app/src'),
+        sync('./backend', '/app'),
     ],
-    entrypoint='cargo run --'
-    
+    entrypoint='sh -c "/app/start.sh || (echo Start script failed! Waiting for changes...; sleep infinity)"'
+)
+
+# Durable Worker
+docker_build_with_restart(
+    'gradewise-durable-worker',
+    './backend',
+    build_args={
+        'TARGET': 'durable-worker',
+        'DEV': DEV,
+    },
+    live_update=[
+        # Sync all source files to the container
+        sync('./backend', '/app'),
+    ],
+    entrypoint='sh -c "/app/start.sh || (echo Start script failed! Waiting for changes...; sleep infinity)"'
 )
 
 # Frontend
@@ -34,8 +50,8 @@ docker_build(
         sync('./frontend', '/app')
     ],
     build_args={
-        'DEV': 'true',
-        'BASE_URL': 'http://localhost:%d' % LOCAL_PORT
+        'BASE_URL': 'http://localhost:%d' % LOCAL_PORT,
+        'DEV': DEV
     },
 )
 
@@ -64,6 +80,7 @@ cmd_button(
 
 # Apply Kubernetes manifests
 k8s_yaml('k8s/api-backend-deployment.yaml')
+k8s_yaml('k8s/durable-worker-deployment.yaml')
 k8s_yaml('k8s/frontend-deployment.yaml')
 
 ## Traefik
@@ -79,4 +96,8 @@ k8s_yaml('k8s/traefik/ingress/frontend.yml')
 
 
 # Expose Traefik
-k8s_resource('traefik-deployment', port_forwards=['%d:80' % LOCAL_PORT, '8080:8080'])
+k8s_resource(
+    'traefik-deployment',
+    port_forwards=['%d:80' % LOCAL_PORT, '8080:8080'],
+    resource_deps=['gradewise-frontend', 'gradewise-api-backend']
+)

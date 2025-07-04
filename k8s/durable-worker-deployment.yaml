@@ -1,28 +1,25 @@
 apiVersion: apps/v1
 kind: Deployment
 metadata:
-  name: gradewise-api-backend
+  name: gradewise-durable-worker
   labels:
-    app: gradewise-api-backend
+    app: gradewise-durable-worker
 spec:
   replicas: 1
   selector:
     matchLabels:
-      app: gradewise-api-backend
+      app: gradewise-durable-worker
   template:
     metadata:
       labels:
-        app: gradewise-api-backend
+        app: gradewise-durable-worker
     spec:
       containers:
-        - name: gradewise-api-backend
-          image: gradewise-api-backend:latest
+        - name: gradewise-durable-worker
+          image: gradewise-durable-worker:latest
           ports:
             - name: web
               containerPort: 8080
-          # env:
-          #   - name: PORT
-          #     value: "80"
           resources:
             limits:
               cpu: "1"
@@ -34,11 +31,11 @@ spec:
 apiVersion: v1
 kind: Service
 metadata:
-  name: gradewise-api-backend
+  name: gradewise-durable-worker
 spec:
   selector:
-    app: gradewise-api-backend
+    app: gradewise-durable-worker
   ports:
-    - name: web
-      port: 80
+    - name: worker
+      port: 8080
       targetPort: web

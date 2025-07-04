@@ -19,10 +19,8 @@ spec:
           image: gradewise-frontend:latest
           ports:
             - name: web
-              containerPort: 80
+              containerPort: 8080
           env:
-            - name: PORT
-              value: "80"
             - name: NODE_ENV
               value: "development"
             - name: API_URL
