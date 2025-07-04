@@ -9,19 +9,16 @@ ENV PUBLIC_BASE_URL=$BASE_URL
 
 COPY . .
 
-RUN bun install
-
-# Builds to /app/build
-RUN bun run build
-
 EXPOSE 80
 
+# Run based on DEV, but always install before
 COPY <<EOF /app/start.sh
 #!/bin/sh
+bun install
 if [ "$DEV" = "true" ]; then
     bun run dev --host --port 80
 else
-    bun build/index.js --host 0.0.0.0 --port 80
+    bun run build && bun build/index.js --host 0.0.0.0 --port 80
 fi
 EOF
 
