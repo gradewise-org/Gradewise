@@ -15,15 +15,15 @@ kubectl exec "$POD_NAME" -- $command
 docker_build_with_restart(
     'gradewise-api-backend',
     './api-backend',
-    trigger=['./api-backend'],
-    entrypoint=['/app/api'],
+    build_args={
+        'DEV': 'true',
+    },
     live_update=[
-        # Sync all Go files to the container
-        sync('./api-backend', '/app'),
-        
-        # Rebuild the binary when code changes
-        run('cd /app && go build -o ./api ./main.go')
-    ]
+        # Sync all source files to the container
+        sync('./api-backend/src', '/app/src'),
+    ],
+    entrypoint='cargo run --'
+    
 )
 
 # Frontend

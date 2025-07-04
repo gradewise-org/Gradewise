@@ -1,19 +1,26 @@
-FROM golang:1.24
+FROM rust:alpine
 
-# Set the working directory
+ARG TARGET_NAME=gradewise-api-backend
+ARG DEV=false
+
+# Set and copy working directory
 WORKDIR /app
-
-# Copy the api-backend directory
 COPY . .
 
-# Download the Go dependencies
-RUN go mod download
+# Install build dependencies for musl
+RUN apk add --no-cache musl-dev build-base
 
-# Build the API backend
-RUN go build -o ./api ./main.go
-
-# Expose the port
 EXPOSE 80
 
-# Run the API backend
-CMD ["./app/api"]
+# Run based on DEV
+COPY <<EOF /app/start.sh
+#!/bin/sh
+if [ "$DEV" = "true" ]; then
+    cargo run --
+else
+    cargo run --release --
+fi
+EOF
+
+RUN chmod +x /app/start.sh
+ENTRYPOINT ["/app/start.sh"]
