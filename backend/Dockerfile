@@ -14,8 +14,8 @@ RUN if [ "$TARGET" = "NOT_SET" ]; then \
 WORKDIR /app
 COPY . .
 
-# Install build dependencies for musl
-RUN apk add --no-cache musl-dev build-base
+# Install build dependencies for musl and OpenSSL
+RUN apk add --no-cache musl-dev build-base openssl-dev openssl-libs-static pkgconf
 
 EXPOSE 8080
 

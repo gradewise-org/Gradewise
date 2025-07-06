@@ -1,0 +1,22 @@
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: register-durable-worker
+spec:
+  template:
+    spec:
+      restartPolicy: OnFailure
+      containers:
+        - name: register
+          image: curlimages/curl:8.7.1
+          command: ["sh", "-c"]
+          args:
+            - |
+              set -e
+              echo "Waiting for restate-server..."
+              until curl -s http://restate-server:9070/healthz; do sleep 2; done
+              echo "Waiting for durable-worker..."
+              # until curl -s http://gradewise-durable-worker:8080/healthz; do sleep 2; done
+              echo "Registering durable-worker with restate-server..."
+              curl -X POST http://restate-server:9070/deployments --header 'Content-Type: application/json' --data '{"uri": "http://gradewise-durable-worker:8080"}'
+              echo "Registration complete."

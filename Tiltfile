@@ -24,7 +24,7 @@ docker_build_with_restart(
         # Sync all source files to the container
         sync('./backend', '/app'),
     ],
-    entrypoint='sh -c "/app/start.sh || (echo Start script failed! Waiting for changes...; sleep infinity)"'
+    entrypoint='sh -c "(cd /app; cargo run --bin backend-api) || (echo Start script failed! Waiting for changes...; sleep infinity)"'
 )
 
 # Durable Worker
@@ -39,7 +39,7 @@ docker_build_with_restart(
         # Sync all source files to the container
         sync('./backend', '/app'),
     ],
-    entrypoint='sh -c "/app/start.sh || (echo Start script failed! Waiting for changes...; sleep infinity)"'
+    entrypoint='sh -c "(cd /app; cargo run --bin durable-worker) || (echo Start script failed! Waiting for changes...; sleep infinity)"'
 )
 
 # Frontend
@@ -82,6 +82,8 @@ cmd_button(
 k8s_yaml('k8s/api-backend-deployment.yaml')
 k8s_yaml('k8s/durable-worker-deployment.yaml')
 k8s_yaml('k8s/frontend-deployment.yaml')
+k8s_yaml('k8s/restate-server-deployment.yaml')
+k8s_yaml('k8s/restate-server-register-job.yaml')
 
 ## Traefik
 k8s_yaml('k8s/traefik/role.yml')
@@ -100,4 +102,9 @@ k8s_resource(
     'traefik-deployment',
     port_forwards=['%d:80' % LOCAL_PORT, '8080:8080'],
     resource_deps=['gradewise-frontend', 'gradewise-api-backend']
+)
+
+k8s_resource(
+    'restate-server',
+    port_forwards=['18080:8080', '9070:9070'],
 )
