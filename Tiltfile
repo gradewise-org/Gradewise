@@ -5,6 +5,14 @@ DEV = 'true'
 load('ext://restart_process', 'docker_build_with_restart')
 load('ext://uibutton', 'cmd_button', 'text_input')
 
+# Prune settings
+docker_prune_settings(
+    disable=False,
+    max_age_mins=10,
+    num_builds=1,
+    keep_recent=1
+)
+
 pod_exec_script = '''
 set -eu
 # get k8s pod name from tilt resource name
@@ -24,7 +32,7 @@ docker_build_with_restart(
         # Sync all source files to the container
         sync('./backend', '/app'),
     ],
-    entrypoint='sh -c "(cd /app; cargo run --bin backend-api) || (echo Start script failed! Waiting for changes...; sleep infinity)"'
+    entrypoint='sh -c "(/app/start.sh) || (echo Start script failed! Waiting for changes...; sleep infinity)"'
 )
 
 # Durable Worker
@@ -39,7 +47,7 @@ docker_build_with_restart(
         # Sync all source files to the container
         sync('./backend', '/app'),
     ],
-    entrypoint='sh -c "(cd /app; cargo run --bin durable-worker) || (echo Start script failed! Waiting for changes...; sleep infinity)"'
+    entrypoint='sh -c "(/app/start.sh) || (echo Start script failed! Waiting for changes...; sleep infinity)"'
 )
 
 # Frontend
