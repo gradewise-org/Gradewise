@@ -30,9 +30,17 @@ spec:
               value: "true"
             - name: RESTATE_ADVERTISED_ADDRESS
               value: "http://restate-server:5122"
+          resources:
+            requests:
+              memory: "512Mi"
+              cpu: "250m"
+            limits:
+              memory: "1Gi"
+              cpu: "500m"
       volumes:
         - name: restate-data
-          emptyDir: {}
+          emptyDir:
+            sizeLimit: "1Gi"
 ---
 apiVersion: v1
 kind: Service

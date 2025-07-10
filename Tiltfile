@@ -116,3 +116,8 @@ k8s_resource(
     'restate-server',
     port_forwards=['18080:8080', '9070:9070'],
 )
+
+k8s_resource(
+    'register-durable-worker',
+    resource_deps=['restate-server', 'gradewise-durable-worker']
+)
