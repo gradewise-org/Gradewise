@@ -13,9 +13,11 @@ async fn main() {
         .route("/", get(hello_world))
         .route("/health", get(|| async { "Healthy!" }))
         .nest("/counter", counter::routes())
-        .nest("/service", Router::new()
-            .route("/add", get(call_service))
-            .route("/count", get(get_count_service))
+        .nest(
+            "/service",
+            Router::new()
+                .route("/add", get(call_service))
+                .route("/count", get(get_count_service)),
         );
 
     // run our app with hyper, listening globally on port 3000
@@ -31,8 +33,7 @@ async fn call_service() -> String {
     let client = HttpCounterServiceClient::new(RESTATE_SERVER_BASE_URL.to_string());
 
     println!("Calling the counter service...");
-    let response = client
-        .increment().await;
+    let response = client.increment().await;
     println!("Received response from the counter service...");
     match response {
         Ok(res) => format!("Counter incremented successfully: {res:?}"),
