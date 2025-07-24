@@ -1,0 +1,148 @@
+apiVersion: v1
+kind: Secret
+metadata:
+  name: postgres-secret
+type: Opaque
+data:
+  POSTGRES_USER: cG9zdGdyZXM= # base64 encoded "postgres"
+  POSTGRES_PASSWORD: cGFzc3dvcmQ= # base64 encoded "password"
+  POSTGRES_DB: Z3JhZGV3aXNl # base64 encoded "gradewise"
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: postgres-init-script
+data:
+  init.sql: |
+    -- Create databases
+    CREATE DATABASE gradewise_api;
+    CREATE DATABASE temporal;
+    CREATE DATABASE temporal_visibility;
+
+    -- Create users with appropriate permissions
+    CREATE USER gradewise_user WITH PASSWORD 'gradewise_pass';
+    CREATE USER temporal_user WITH PASSWORD 'temporal_pass' CREATEDB;
+
+    -- Grant permissions
+    GRANT ALL PRIVILEGES ON DATABASE gradewise_api TO gradewise_user;
+    GRANT ALL PRIVILEGES ON DATABASE temporal TO temporal_user;
+    GRANT ALL PRIVILEGES ON DATABASE temporal_visibility TO temporal_user;
+
+    -- Connect to gradewise_api and create sample table for testing
+    \c gradewise_api;
+    CREATE TABLE IF NOT EXISTS health_check (
+        id SERIAL PRIMARY KEY,
+        status VARCHAR(20) NOT NULL,
+        checked_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+    );
+    INSERT INTO health_check (status) VALUES ('initialized');
+
+    -- Grant permissions to gradewise_user
+    GRANT ALL PRIVILEGES ON TABLE health_check TO gradewise_user;
+    GRANT ALL PRIVILEGES ON SEQUENCE health_check_id_seq TO gradewise_user;
+
+    -- Grant schema permissions for temporal databases
+    \c temporal;
+    GRANT ALL PRIVILEGES ON SCHEMA public TO temporal_user;
+    \c temporal_visibility;
+    GRANT ALL PRIVILEGES ON SCHEMA public TO temporal_user;
+---
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: postgres-storage
+spec:
+  accessModes:
+    - ReadWriteOnce
+  resources:
+    requests:
+      storage: 5Gi
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: postgres
+  labels:
+    app: postgres
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: postgres
+  template:
+    metadata:
+      labels:
+        app: postgres
+    spec:
+      containers:
+        - name: postgres
+          image: postgres:15-alpine
+          ports:
+            - containerPort: 5432
+          env:
+            - name: POSTGRES_USER
+              valueFrom:
+                secretKeyRef:
+                  name: postgres-secret
+                  key: POSTGRES_USER
+            - name: POSTGRES_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: postgres-secret
+                  key: POSTGRES_PASSWORD
+            - name: POSTGRES_DB
+              valueFrom:
+                secretKeyRef:
+                  name: postgres-secret
+                  key: POSTGRES_DB
+            - name: PGDATA
+              value: /var/lib/postgresql/data/pgdata
+          volumeMounts:
+            - name: postgres-storage
+              mountPath: /var/lib/postgresql/data
+            - name: postgres-init-script
+              mountPath: /docker-entrypoint-initdb.d
+          resources:
+            requests:
+              memory: "256Mi"
+              cpu: "250m"
+            limits:
+              memory: "512Mi"
+              cpu: "500m"
+          readinessProbe:
+            exec:
+              command:
+                - /bin/sh
+                - -c
+                - pg_isready -U $POSTGRES_USER -d $POSTGRES_DB
+            initialDelaySeconds: 10
+            periodSeconds: 2
+            timeoutSeconds: 3
+          livenessProbe:
+            exec:
+              command:
+                - /bin/sh
+                - -c
+                - pg_isready -U $POSTGRES_USER -d $POSTGRES_DB
+            initialDelaySeconds: 20
+            periodSeconds: 10
+            timeoutSeconds: 3
+      volumes:
+        - name: postgres-storage
+          persistentVolumeClaim:
+            claimName: postgres-storage
+        - name: postgres-init-script
+          configMap:
+            name: postgres-init-script
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: postgres
+spec:
+  selector:
+    app: postgres
+  ports:
+    - name: postgresql
+      port: 5432
+      targetPort: 5432

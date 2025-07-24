@@ -1,0 +1,41 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: gradewise-temporal-worker
+  labels:
+    app: gradewise-temporal-worker
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: gradewise-temporal-worker
+  template:
+    metadata:
+      labels:
+        app: gradewise-temporal-worker
+    spec:
+      containers:
+        - name: gradewise-temporal-worker
+          image: gradewise-temporal-worker:latest
+          ports:
+            - name: web
+              containerPort: 8080
+          resources:
+            limits:
+              cpu: "1"
+              memory: "2Gi"
+            requests:
+              cpu: "500m"
+              memory: "512Mi"
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: gradewise-temporal-worker
+spec:
+  selector:
+    app: gradewise-temporal-worker
+  ports:
+    - name: worker
+      port: 8080
+      targetPort: web

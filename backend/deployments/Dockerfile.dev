@@ -1,0 +1,15 @@
+# --- Minimal runtime stage ---
+FROM alpine:3.20
+
+ARG APP
+ARG GIN_MODE=debug
+ENV GIN_MODE=$GIN_MODE
+
+# If you need TLS, install ca-certificates
+# RUN apk --no-cache add ca-certificates
+
+COPY ../bin/${APP} /app
+
+EXPOSE 8080
+
+ENTRYPOINT ["/app"]

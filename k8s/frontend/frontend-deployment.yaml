@@ -1,0 +1,46 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: gradewise-frontend
+  labels:
+    app: gradewise-frontend
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: gradewise-frontend
+  template:
+    metadata:
+      labels:
+        app: gradewise-frontend
+    spec:
+      containers:
+        - name: gradewise-frontend
+          image: gradewise-frontend:latest
+          ports:
+            - name: web
+              containerPort: 8080
+          env:
+            - name: NODE_ENV
+              value: "development"
+            - name: API_URL
+              value: "http://gradewise-api-backend:80"
+          resources:
+            limits:
+              cpu: "1000m"
+              memory: "1Gi"
+            requests:
+              cpu: "500m"
+              memory: "512Mi"
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: gradewise-frontend
+spec:
+  selector:
+    app: gradewise-frontend
+  ports:
+    - name: web
+      port: 80
+      targetPort: web

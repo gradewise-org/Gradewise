@@ -1,0 +1,29 @@
+openapi: 3.0.3
+info:
+  title: gradewise-api-backend
+  version: 1.0.0
+servers:
+  - url: /v1
+paths:
+  /greet:
+    get:
+      summary: Greet a user by name
+      operationId: GreetUser
+      parameters:
+        - name: name
+          in: query
+          description: User's name
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          description: Successful greeting
+          content:
+            application/json:
+              schema:
+                type: string
+                properties:
+                  message:
+                    type: string
+                    example: Hello, Alice! Goodbye!
