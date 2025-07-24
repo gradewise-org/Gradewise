@@ -20,35 +20,48 @@ POD_NAME="$(tilt get kubernetesdiscovery "$resource" -ojsonpath='{.status.pods[0
 kubectl exec "$POD_NAME" -- $command
 '''
 
-# API Backend
+# Set up a local resource to build the API server binary for Linux
+local_resource(
+    'api-server-compile',
+    'cd ./backend && CGO_ENABLED=0 GOOS=linux GOARCH=amd64 make all',
+    deps='./backend',
+    ignore='./backend/bin'
+)
+
+# Build the Docker image, only including the built binary
+load('ext://restart_process', 'docker_build_with_restart')
+
 docker_build_with_restart(
     'gradewise-api-backend',
     './backend',
+    dockerfile='./backend/deployments/Dockerfile.dev',
     build_args={
-        'TARGET': 'backend-api',
-        'DEV': DEV,
+        'APP': 'server',
+        'GIN_MODE': 'debug' if DEV == 'true' else 'release',
     },
+    only=['bin/server'], # narrow context to only the relevant binary
     live_update=[
-        # Sync all source files to the container
-        sync('./backend', '/app'),
+        sync('./backend/bin/server', '/app'),
     ],
-    entrypoint='sh -c "(/app/start.sh) || (echo Start script failed! Waiting for changes...; sleep infinity)"'
+    entrypoint='/app',
 )
 
-# Durable Worker
 docker_build_with_restart(
-    'gradewise-durable-worker',
+    'gradewise-temporal-worker',
     './backend',
+    dockerfile='./backend/deployments/Dockerfile.dev',
     build_args={
-        'TARGET': 'durable-worker',
-        'DEV': DEV,
+        'APP': 'worker',
+        'GIN_MODE': 'debug' if DEV == 'true' else 'release',
     },
+    only=['bin/worker'], # narrow context to only the relevant binary
     live_update=[
-        # Sync all source files to the container
-        sync('./backend', '/app'),
+        sync('./backend/bin/worker', '/app'),
     ],
-    entrypoint='sh -c "(/app/start.sh) || (echo Start script failed! Waiting for changes...; sleep infinity)"'
+    entrypoint='/app',
 )
+
+
 
 # Frontend
 docker_build(
@@ -87,37 +100,50 @@ cmd_button(
 )
 
 # Apply Kubernetes manifests
-k8s_yaml('k8s/api-backend-deployment.yaml')
-k8s_yaml('k8s/durable-worker-deployment.yaml')
-k8s_yaml('k8s/frontend-deployment.yaml')
-k8s_yaml('k8s/restate-server-deployment.yaml')
-k8s_yaml('k8s/restate-server-register-job.yaml')
+k8s_yaml('k8s/backend/postgres-deployment.yaml')
+k8s_yaml('k8s/backend/temporal-server-deployment.yaml')
+k8s_yaml('k8s/backend/api-backend-deployment.yaml')
+k8s_yaml('k8s/backend/temporal-worker-deployment.yaml')
+k8s_yaml('k8s/frontend/frontend-deployment.yaml')
 
-## Traefik
+# Traefik Ingress Controller
 k8s_yaml('k8s/traefik/role.yml')
 k8s_yaml('k8s/traefik/account.yml')
 k8s_yaml('k8s/traefik/role-binding.yml')
 k8s_yaml('k8s/traefik/traefik.yml')
 k8s_yaml('k8s/traefik/traefik-services.yml')
 
-# Ingress
+# Ingress Routes
 k8s_yaml('k8s/traefik/ingress/api-backend.yml')
 k8s_yaml('k8s/traefik/ingress/frontend.yml')
 
 
-# Expose Traefik
+# Resource Dependencies and Port Forwards
+k8s_resource(
+    'temporal-server',
+    port_forwards=['8233:7233'],  # gRPC API only
+    resource_deps=['postgres']
+)
+
+k8s_resource(
+    'temporal-ui',
+    port_forwards=['8081:8080'],  # Web UI
+    resource_deps=['temporal-server']
+)
+
+k8s_resource(
+    'gradewise-api-backend',
+    resource_deps=['postgres']
+)
+
+k8s_resource(
+    'gradewise-temporal-worker',
+    resource_deps=['temporal-server']
+)
+
+# Main Application Gateway
 k8s_resource(
     'traefik-deployment',
-    port_forwards=['%d:80' % LOCAL_PORT, '8080:8080'],
+    port_forwards=['%d:80' % LOCAL_PORT, '8080:8080'],  # App traffic, Traefik dashboard
     resource_deps=['gradewise-frontend', 'gradewise-api-backend']
-)
-
-k8s_resource(
-    'restate-server',
-    port_forwards=['18080:8080', '9070:9070'],
-)
-
-k8s_resource(
-    'register-durable-worker',
-    resource_deps=['restate-server', 'gradewise-durable-worker']
 )

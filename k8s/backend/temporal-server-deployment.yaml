@@ -1,0 +1,210 @@
+apiVersion: v1
+kind: Secret
+metadata:
+  name: temporal-server-config
+type: Opaque
+data:
+  # base64 encoded "temporal_pass"
+  DB_PASSWORD: dGVtcG9yYWxfcGFzcw==
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: temporal-server
+  labels:
+    app: temporal-server
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: temporal-server
+  template:
+    metadata:
+      labels:
+        app: temporal-server
+    spec:
+      containers:
+        - name: temporal-server
+          image: temporalio/auto-setup:1.25.2
+          ports:
+            - name: rpc
+              containerPort: 7233
+            - name: web
+              containerPort: 8080
+          env:
+            # Database configuration - use correct env vars for temporal
+            - name: DB
+              value: "postgres12"
+            - name: DB_PORT
+              value: "5432"
+            - name: POSTGRES_USER
+              value: "temporal_user"
+            - name: POSTGRES_PWD
+              valueFrom:
+                secretKeyRef:
+                  name: temporal-server-config
+                  key: DB_PASSWORD
+            - name: POSTGRES_SEEDS
+              value: "postgres"
+            - name: POSTGRES_TLS_ENABLED
+              value: "false"
+
+            # Temporal specific database names
+            - name: TEMPORAL_DB
+              value: "temporal"
+            - name: VISIBILITY_DB
+              value: "temporal_visibility"
+
+            # Disable advanced visibility (Elasticsearch)
+            - name: ENABLE_ES
+              value: "false"
+
+            # Auto-setup configuration
+            - name: SKIP_SCHEMA_SETUP
+              value: "false"
+            - name: SKIP_DEFAULT_NAMESPACE_CREATION
+              value: "false"
+
+          readinessProbe:
+            tcpSocket:
+              port: 7233
+            initialDelaySeconds: 45
+            periodSeconds: 10
+            timeoutSeconds: 5
+            failureThreshold: 6
+          livenessProbe:
+            tcpSocket:
+              port: 7233
+            initialDelaySeconds: 90
+            periodSeconds: 30
+            timeoutSeconds: 5
+            failureThreshold: 3
+          resources:
+            requests:
+              memory: "512Mi"
+              cpu: "200m"
+            limits:
+              memory: "1Gi"
+              cpu: "500m"
+      initContainers:
+        - name: wait-for-postgres
+          image: postgres:15-alpine
+          env:
+            - name: PGPASSWORD
+              value: "temporal_pass"
+          command: ["sh", "-c"]
+          args:
+            - |
+              echo "Waiting for PostgreSQL to be ready..."
+              until pg_isready -h postgres -p 5432 -U temporal_user; do
+                echo "PostgreSQL not ready, waiting..."
+                sleep 3
+              done
+              echo "PostgreSQL is ready!"
+
+              echo "Testing connection to temporal database..."
+              until psql -h postgres -U temporal_user -d temporal -c '\q'; do
+                echo "Cannot connect to temporal database, waiting..."
+                sleep 3
+              done
+              echo "Connection to temporal database successful!"
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: temporal-server
+spec:
+  selector:
+    app: temporal-server
+  ports:
+    - name: rpc
+      port: 7233
+      targetPort: 7233
+    - name: web
+      port: 8080
+      targetPort: 8080
+---
+# Temporal Web UI Service (separate for clarity)
+apiVersion: v1
+kind: Service
+metadata:
+  name: temporal-web
+spec:
+  selector:
+    app: temporal-server
+  ports:
+    - name: web
+      port: 8080
+      targetPort: 8080
+---
+# Temporal Web UI Deployment - Separate container for the UI
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: temporal-ui
+  labels:
+    app: temporal-ui
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: temporal-ui
+  template:
+    metadata:
+      labels:
+        app: temporal-ui
+    spec:
+      containers:
+        - name: temporal-ui
+          image: temporalio/ui:2.39.0
+          ports:
+            - name: ui
+              containerPort: 8080
+          env:
+            # Official Temporal UI environment variables
+            - name: TEMPORAL_ADDRESS
+              value: "temporal-server:7233"
+            - name: TEMPORAL_UI_PORT
+              value: "8080"
+            - name: TEMPORAL_UI_ENABLED
+              value: "true"
+            - name: TEMPORAL_DEFAULT_NAMESPACE
+              value: "default"
+            - name: TEMPORAL_NOTIFY_ON_NEW_VERSION
+              value: "false"
+            - name: TEMPORAL_HIDE_LOGS
+              value: "false"
+          resources:
+            requests:
+              memory: "128Mi"
+              cpu: "100m"
+            limits:
+              memory: "256Mi"
+              cpu: "200m"
+          readinessProbe:
+            httpGet:
+              path: /
+              port: 8080
+            initialDelaySeconds: 10
+            periodSeconds: 5
+            timeoutSeconds: 3
+          livenessProbe:
+            httpGet:
+              path: /
+              port: 8080
+            initialDelaySeconds: 30
+            periodSeconds: 10
+            timeoutSeconds: 3
+---
+# Temporal UI Service
+apiVersion: v1
+kind: Service
+metadata:
+  name: temporal-ui
+spec:
+  selector:
+    app: temporal-ui
+  ports:
+    - name: ui
+      port: 8080
+      targetPort: 8080
