@@ -19,22 +19,22 @@ jobs:
           file: ./backend/deployments/Dockerfile
           build-args: |
             APP=server
-            build-temporal-worker:
-              name: Build Temporal worker
-              runs-on: ubuntu-latest
-              steps:
-                - uses: actions/checkout@v4
-                - name: Set up QEMU
-                uses: docker/setup-qemu-action@v3
-                - name: Set up Docker Buildx
-                uses: docker/setup-buildx-action@v3
-                - name: Build Temporal worker
-                uses: docker/build-push-action@v6
-                with:
-                  context: ./backend
-                  file: ./backend/deployments/Dockerfile
-                  build-args: |
-                  APP=worker
+  build-temporal-worker:
+    name: Build API server
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Set up QEMU
+        uses: docker/setup-qemu-action@v3
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+      - name: Build API Server
+        uses: docker/build-push-action@v6
+        with:
+          context: ./backend
+          file: ./backend/deployments/Dockerfile
+          build-args: |
+            APP=worker
   test-backend:
     name: Test API server
     runs-on: ubuntu-latest
