@@ -23,5 +23,5 @@ worker: generate
 	@ls -lh $(BIN_DIR)/worker
 
 clean:
-	rm  $(BIN_DIR)/*
-	rm internal/api/gen.go
+	rm -f $(BIN_DIR)/*
+	rm -f internal/api/gen.go
