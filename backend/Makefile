@@ -1,6 +1,10 @@
 APP_SERVER=cmd/server
 APP_WORKER=cmd/worker
 BIN_DIR=bin
+GENERATE_ENV=generate.env
+
+include $(GENERATE_ENV)
+export CGO_ENABLED GOOS GOARCH
 
 .PHONY: all server worker clean
 
@@ -8,7 +12,7 @@ all: server worker
 
 internal/api/gen.go: api/api.yaml api/oapi-codegen.yaml
 	@echo "Generating API code from OpenAPI spec..."
-	go generate
+	time go generate
 
 generate: internal/api/gen.go
 
@@ -21,6 +25,10 @@ worker: generate
 	@echo "Building worker..."
 	time go build -o $(BIN_DIR)/worker $(APP_WORKER)/main.go
 	@ls -lh $(BIN_DIR)/worker
+
+test:
+	@echo "Testing..."
+	time go test ./...
 
 clean:
 	rm -f $(BIN_DIR)/*

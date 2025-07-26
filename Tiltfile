@@ -23,7 +23,7 @@ kubectl exec "$POD_NAME" -- $command
 # Set up a local resource to build the API server binary for Linux
 local_resource(
     'api-server-compile',
-    'cd ./backend && CGO_ENABLED=0 GOOS=linux GOARCH=amd64 make all',
+    'cd ./backend && make all',
     deps='./backend',
     ignore=['./backend/bin', './backend/internal/api/gen.go']
 )
