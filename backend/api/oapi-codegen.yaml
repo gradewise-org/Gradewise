@@ -3,4 +3,4 @@ package: api
 generate:
   gin-server: true
   models: true
-output: ../internal/pkg/api/gen.go
+output: ./internal/api/gen.go # relative to directory of generate.go (/backend)
