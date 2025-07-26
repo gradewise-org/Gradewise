@@ -1,7 +1,7 @@
 # --- Build stage ---
 FROM golang:1.24-alpine AS builder
 
-ARG APP=server
+ARG APP
 ARG GIN_MODE=release
 ENV CGO_ENABLED=0
 ENV GOOS=linux

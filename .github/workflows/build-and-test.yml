@@ -1,0 +1,80 @@
+# yaml-language-server: $schema=https://raw.githubusercontent.com/SchemaStore/schemastore/refs/heads/master/src/schemas/json/github-workflow.json
+
+name: Build and Test
+on: push
+jobs:
+  build-api-server:
+    name: Build API server
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Set up QEMU
+        uses: docker/setup-qemu-action@v3
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+      - name: Build API Server
+        uses: docker/build-push-action@v6
+        with:
+          context: ./backend
+          file: ./backend/deployments/Dockerfile
+          build-args: |
+            APP=server
+            build-temporal-worker:
+              name: Build Temporal worker
+              runs-on: ubuntu-latest
+              steps:
+                - uses: actions/checkout@v4
+                - name: Set up QEMU
+                uses: docker/setup-qemu-action@v3
+                - name: Set up Docker Buildx
+                uses: docker/setup-buildx-action@v3
+                - name: Build Temporal worker
+                uses: docker/build-push-action@v6
+                with:
+                  context: ./backend
+                  file: ./backend/deployments/Dockerfile
+                  build-args: |
+                  APP=worker
+  test-backend:
+    name: Test API server
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Set up Go
+        uses: actions/setup-go@v5
+        with:
+          go-version-file: ./backend/go.mod
+          cache-dependency-path: ./backend/go.sum
+      - name: Run tests
+        working-directory: ./backend
+        run: go test
+  build-frontend:
+    name: Build frontend
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: oven-sh/setup-bun@v2
+      - name: Install dependencies
+        run: bun install
+        working-directory: ./frontend
+      - name: Copy .env.example to .env
+        run: cp .env.example .env
+        working-directory: ./frontend
+      - name: Build frontend
+        run: bun run build
+        working-directory: ./frontend
+  test-frontend:
+    name: Test frontend
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: oven-sh/setup-bun@v2
+      - name: Install dependencies
+        run: bun install
+        working-directory: ./frontend
+      - name: Copy .env.example to .env
+        run: cp .env.example .env
+        working-directory: ./frontend
+      - name: Run tests
+        run: bun run test
+        working-directory: ./frontend
