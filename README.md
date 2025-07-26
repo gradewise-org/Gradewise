@@ -33,11 +33,24 @@ Install [Traefik CRDs](https://doc.traefik.io/traefik/providers/kubernetes-crd/)
 kubectl apply -f https://raw.githubusercontent.com/traefik/traefik/v3.5/docs/content/reference/dynamic-configuration/kubernetes-crd-definition-v1.yml
 ```
 
-### 4. Key Commands
+### 4. Install Act (GitHub Actions Local Runner)
+
+**Recommended: Homebrew (macOS/Linux)**
+
+```bash
+brew install act
+```
+
+**Other platforms:** See [Act installation docs](https://github.com/nektos/act#installation)
+
+### 5. Key Commands
 
 - `tilt up` - Start your development environment
 - `tilt down` - Stop all services
 - `kubectl get pods` - Check service status
+- `act` - Run GitHub Actions locally
+- `act -l` - List available workflows
+- `act -j <job-name>` - Run specific job
 
 ## Architecture
 
@@ -69,17 +82,6 @@ kubectl apply -f https://raw.githubusercontent.com/traefik/traefik/v3.5/docs/con
 
 ## Development
 
-### Database Management
-
-- **Clean database**: `./backend/scripts/clean-dev-data.sh` (stops Tilt, cleans data)
-- **Quick clean**: Use "clean-dev-data" button in Tilt UI (while Tilt running)
-
-### Building & Debugging
-
-- **Build backend**: The backend must be built for Linux containers. Tilt handles this automatically with `CGO_ENABLED=0 GOOS=linux GOARCH=amd64 make all`
-- **View logs**: `kubectl logs -l app=gradewise-api-backend`
-- **Check status**: `kubectl get pods`
-
 ### Development Workflow
 
 1. Start: `tilt up`
@@ -87,3 +89,53 @@ kubectl apply -f https://raw.githubusercontent.com/traefik/traefik/v3.5/docs/con
 3. Test endpoints at http://localhost:3000 (main app), http://localhost:8081 (Temporal UI)
 4. Clean data when needed with script or Tilt button
 5. Debug with `kubectl logs <pod-name>` or Traefik dashboard at http://localhost:8080
+
+### Building & Debugging
+
+- **Build backend**: The backend must be built for Linux containers. Tilt handles this automatically with `CGO_ENABLED=0 GOOS=linux GOARCH=amd64 make all`
+- **View logs**: `kubectl logs -l app=gradewise-api-backend`
+- **Check status**: `kubectl get pods`
+
+### Database Management
+
+- **Clean database**: `./backend/scripts/clean-dev-data.sh` (stops Tilt, cleans data)
+
+### Running GitHub Actions Locally
+
+Use [Act](https://github.com/nektos/act) to run your GitHub Actions workflows locally for faster feedback and testing:
+
+#### Events
+
+By default, `act` runs with the `push` event. You can specify different events:
+
+```bash
+act push              # Run all workflows triggered by push
+act pull_request      # Run all workflows triggered by pull_request
+act schedule          # Run all workflows triggered by schedule
+act workflow_dispatch # Run manually triggered workflows
+```
+
+#### List Available Workflows
+
+```bash
+act -l               # List all workflows
+act -l pull_request  # List workflows for specific event
+```
+
+#### Workflows
+
+By default, `act` runs **all workflows** in `.github/workflows/`. You can specify specific workflows:
+
+```bash
+act -W '.github/workflows/'           # Run all workflows in directory
+act -W '.github/workflows/ci.yml'     # Run specific workflow file
+```
+
+#### Jobs
+
+By default, `act` runs **all jobs** in all workflows. You can run specific jobs:
+
+```bash
+act -j 'test'        # Run all jobs named 'test' in all workflows
+act -j 'build'       # Run all jobs named 'build' in all workflows
+```
