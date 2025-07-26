@@ -28,7 +28,7 @@ worker: generate
 
 test:
 	@echo "Testing..."
-	time go test
+	time go test ./...
 
 clean:
 	rm -f $(BIN_DIR)/*
