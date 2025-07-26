@@ -25,7 +25,7 @@ local_resource(
     'api-server-compile',
     'cd ./backend && CGO_ENABLED=0 GOOS=linux GOARCH=amd64 make all',
     deps='./backend',
-    ignore='./backend/bin'
+    ignore=['./backend/bin', './backend/internal/api/gen.go']
 )
 
 # Build the Docker image, only including the built binary

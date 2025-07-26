@@ -6,17 +6,22 @@ BIN_DIR=bin
 
 all: server worker
 
-server:
+internal/api/gen.go: api/api.yaml api/oapi-codegen.yaml
+	@echo "Generating API code from OpenAPI spec..."
+	go generate
+
+generate: internal/api/gen.go
+
+server: generate
 	@echo "Building server..."
 	time go build -o $(BIN_DIR)/server $(APP_SERVER)/main.go
 	@ls -lh $(BIN_DIR)/server
-	@echo ""
 
-worker:
+worker: generate
 	@echo "Building worker..."
 	time go build -o $(BIN_DIR)/worker $(APP_WORKER)/main.go
 	@ls -lh $(BIN_DIR)/worker
-	@echo ""
 
 clean:
-	rm -rf $(BIN_DIR)/*
+	rm -f $(BIN_DIR)/*
+	rm -f internal/api/gen.go
