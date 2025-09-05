@@ -8,7 +8,7 @@ from pylti1p3.contrib.flask import (
 TOOL_JWKS = {"keys": []}  # replace with  real JWKS later
 load_dotenv("config/.env")
 
-# simplified toool config storage class -> hardcoding Canvas issuers and endpoints, reading it from env variables (config.ini) 
+# simplified tool config storage class -> hardcoding Canvas issuers and endpoints, reading it from env variables (config.ini) 
 # in prod we should have a DB with per platform (LMS) registrations
 class ToolConfStorage:
     def find_registration(self, iss): #returns Canvas metadata so PyLTIp3 can validate launch 
