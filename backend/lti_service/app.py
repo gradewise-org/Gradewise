@@ -2,32 +2,38 @@ import os, json
 from flask import Flask, request, jsonify
 from dotenv import load_dotenv
 from pylti1p3.contrib.flask import (
-    FlaskOIDCLogin, FlaskMessageLaunch, FlaskDbToolConf, FlaskRequest
+    FlaskOIDCLogin, FlaskMessageLaunch, FlaskRequest, FlaskCacheDataStorage
 )
+from pylti1p3.tool_config import ToolConfDict
 
-TOOL_JWKS = {"keys": []}  # replace with  real JWKS later
 load_dotenv("config/.env")
 
-# simplified tool config storage class -> hardcoding Canvas issuers and endpoints, reading it from env variables (config.ini) 
-# in prod we should have a DB with per platform (LMS) registrations
-class ToolConfStorage:
-    def find_registration(self, iss): #returns Canvas metadata so PyLTIp3 can validate launch 
-        return {
-            "issuer": "https://canvas.instructure.com",
-            "client_id": os.environ["CANVAS_CLIENT_ID"],
-            "auth_login_url": os.environ["CANVAS_OIDC_AUTH_URL"],
-            "auth_token_url": os.environ["CANVAS_TOKEN_URL"],
-            "key_set_url": os.environ["CANVAS_JWKS_URL"],
-            "audience": os.environ["CANVAS_CLIENT_ID"]
-        }
-    def get_jwt_verify_keys(self, iss): #left empty for now becauase PyLTIp3 will fetch Canvas JWT keys automatically from key_set_url. (will  have to implement this for other LMS)
-        return None
+# ---- Tool Configuration ----- #
+ISSUER = "https://canvas.instructure.com"
+
+tool_conf = ToolConfDict({
+    ISSUER: [{
+        "default": True,
+        "client_id": os.environ["CANVAS_CLIENT_ID"],
+        "auth_login_url": os.environ["CANVAS_OIDC_AUTH_URL"],
+        "auth_token_url": os.environ["CANVAS_TOKEN_URL"],
+        "auth_audience": os.environ.get("CANVAS_TOKEN_AUDIENCE"),  # often same as token URL; ok if missing
+        "key_set_url": os.environ["CANVAS_JWKS_URL"],
+        # For deep linking / tool-signed JWTs, set one of the following:
+        # "private_key_file": "config/private.key",
+        # "public_key_file": "config/public.key",
+        # or inline:
+        # "private_key": os.environ.get("TOOL_PRIVATE_KEY_PEM"),
+        # "public_key": os.environ.get("TOOL_PUBLIC_KEY_PEM"),
+        "deployment_ids": [os.environ.get("CANVAS_DEPLOYMENT_ID", "")]  # optional but recommended
+    }]
+})
 
 
-#wrap storage in flask adapter, start flask app, 
-tool_conf = FlaskDbToolConf(ToolConfStorage()) 
+# ---- Flask App ---- #
 app = Flask(__name__)
 app.secret_key = os.environ.get("FLASK_SECRET", "change-me")
+TOOL_JWKS = {"keys": []}  # replace with  actual tool JWKS later when we start signing responses
 
 
 @app.route("/jwks.json")
