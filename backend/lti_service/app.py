@@ -43,17 +43,11 @@ def jwks():
 
 @app.route("/oidc-login", methods=["POST"])
 def oidc_login():
-    # Canvas posts iss, login_hint, target_link_uri (and maybe lti_message_hint)
     login = FlaskOIDCLogin(FlaskRequest(), tool_conf)
-    iss = request.form["iss"]
-    login_hint = request.form.get("login_hint", "")
+    # The library reads iss/login_hint/lti_message_hint from the request object
     target_link_uri = request.form["target_link_uri"]
-    lti_message_hint = request.form.get("lti_message_hint")
-    return login.redirect(
-        iss, login_hint,
-        target_link_uri=target_link_uri,
-        lti_message_hint=lti_message_hint
-    )
+    return login.redirect(target_link_uri)    # only pass the target link URI
+
 
 @app.route("/launch", methods=["POST"])
 def launch():
