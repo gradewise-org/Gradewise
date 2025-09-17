@@ -39,6 +39,7 @@ def jwks():
     # Serve public keys so Canvas can validate any JWTs (e.g., for Deep Linking responses).
     return jsonify(TOOL_JWKS)
 
+
 @app.route("/lti/oidc-login", methods=["POST"])
 def oidc_login():
     login = FlaskOIDCLogin(FlaskRequest(), tool_conf)
