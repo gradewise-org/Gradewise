@@ -6,9 +6,11 @@ from pylti1p3.contrib.flask import (
 )
 from pylti1p3.tool_config import ToolConfDict
 
-load_dotenv("config/.env")
+load_dotenv("/.env")
 
 # ---- Tool Configuration ----- #
+ISSUER = "https://canvas.instructure.com"
+
 tool_conf = ToolConfDict({
     ISSUER: [{
         "default": True,
