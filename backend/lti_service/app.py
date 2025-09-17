@@ -64,5 +64,15 @@ def launch():
         "context": launch_data.get("https://purl.imsglobal.org/spec/lti/claim/context", {})
     })
 
+# Just a simple Flask health route to confirm everything is working - not needed for LTI but it's handy to have
+@app.route("/")
+def health():
+    return jsonify({
+        "name": "Gradewise LTI service",
+        "status": "ok",
+        "endpoints": ["/jwks.json", "POST /oidc-login", "POST /launch"]
+    })
+
+
 if __name__ == "__main__":
     app.run(host="0.0.0.0", port=int(os.environ.get("PORT", 8080)))
