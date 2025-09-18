@@ -3,11 +3,13 @@ package main
 import (
 	"gradewise/backend/internal/api"
 	"gradewise/backend/internal/database"
+	"gradewise/backend/internal/temporal"
 	"log"
 	"net/http"
 	"time"
 
 	"github.com/gin-gonic/gin"
+	"go.temporal.io/sdk/client"
 )
 
 func main() {
@@ -19,7 +21,20 @@ func main() {
 		log.Println("Continuing without database connection...")
 	}
 
-	server := api.NewServer()
+	var temporalClient client.Client
+	temporalClient, err = client.Dial(client.Options{
+		HostPort: temporal.GetTemporalAddress(),
+	})
+	if err != nil {
+		log.Printf("Failed to create Temporal client: %v", err)
+		log.Println("Continuing without Temporal (handlers should guard against nil)...")
+	} else {
+		defer temporalClient.Close()
+	}
+
+	// Build your server with injected deps
+	server := api.NewServer(temporalClient)
+
 	r := gin.Default()
 
 	// Health and monitoring endpoints
@@ -32,7 +47,7 @@ func main() {
 			"status": "ok",
 			"time":   gin.H{"timestamp": time.Now().Format(time.RFC3339)},
 		}
-		
+
 		// Add database health check
 		if db != nil {
 			if err := db.HealthCheck(); err != nil {
@@ -50,7 +65,7 @@ func main() {
 				"status": "not_connected",
 			}
 		}
-		
+
 		c.JSON(http.StatusOK, response)
 	})
 
@@ -67,7 +82,7 @@ func main() {
 		status, checkedAt, err := db.GetHealthCheckStatus()
 		if err != nil {
 			c.JSON(http.StatusInternalServerError, gin.H{
-				"error": "Failed to get health check status",
+				"error":   "Failed to get health check status",
 				"details": err.Error(),
 			})
 			return
@@ -76,15 +91,15 @@ func main() {
 		// Update health check
 		if err := db.UpdateHealthCheck("api_test"); err != nil {
 			c.JSON(http.StatusInternalServerError, gin.H{
-				"error": "Failed to update health check",
+				"error":   "Failed to update health check",
 				"details": err.Error(),
 			})
 			return
 		}
 
 		c.JSON(http.StatusOK, gin.H{
-			"message": "Database test successful",
-			"last_status": status,
+			"message":      "Database test successful",
+			"last_status":  status,
 			"last_checked": checkedAt.Format(time.RFC3339),
 			"current_time": time.Now().Format(time.RFC3339),
 		})
@@ -93,9 +108,9 @@ func main() {
 	// Register the API handlers
 	api.RegisterHandlers(r, server)
 
-	s :=&http.Server{
+	s := &http.Server{
 		Handler: r,
-		Addr: "0.0.0.0:8080",
+		Addr:    "0.0.0.0:8080",
 	}
 
 	log.Fatalln(s.ListenAndServe())
