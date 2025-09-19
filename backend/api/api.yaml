@@ -27,3 +27,76 @@ paths:
                   message:
                     type: string
                     example: Hello, Alice! Goodbye!
+  /faculty/register:
+    post:
+      tags: [ Faculty ]
+      summary: Register a new faculty account
+      operationId: RegisterFaculty
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/FacultyRegistrationRequest'
+      responses:
+        "201":
+          description: Faculty created (verification required)
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/FacultyRegistrationResponse'
+        "409":
+          description: Email already registered
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        default:
+          $ref: '#/components/responses/ErrorResponse'
+
+components:
+  responses:
+    Unauthorized:
+      description: Unauthorized
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/Error'
+
+    ErrorResponse:
+      description: Error
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/Error'
+
+  schemas:
+    FacultyRegistrationRequest:
+      type: object
+      required: [ email, password, fullName ]
+      properties:
+        email: { type: string, format: email }
+        password: { type: string, minLength: 8 }
+        fullName: { type: string }
+        institution: { type: string }
+
+    FacultyRegistrationResponse:
+      type: object
+      required: [ facultyId, email, status ]
+      properties:
+        facultyId: { type: string, format: uuid }
+        email: { type: string, format: email }
+        status:
+          type: string
+          enum: [ PENDING_VERIFICATION, VERIFIED ]
+
+    Error:
+      type: object
+      required: [ code, message ]
+      properties:
+        code: { type: string, example: BAD_REQUEST }
+        message: { type: string, example: Invalid request }
+        details:
+          type: object
+          additionalProperties: true
+
