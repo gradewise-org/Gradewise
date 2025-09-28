@@ -5,6 +5,8 @@ from pylti1p3.contrib.flask import (
     FlaskOIDCLogin, FlaskMessageLaunch, FlaskRequest, FlaskCacheDataStorage
 )
 from pylti1p3.tool_config import ToolConfDict
+from flask_caching import Cache
+
 
 load_dotenv(".env")
 
@@ -32,6 +34,10 @@ tool_conf = ToolConfDict({
 
 # ---- Flask App ---- #
 app = Flask(__name__)
+app.config.update(
+    SESSION_COOKIE_SAMESITE="None",
+    SESSION_COOKIE_SECURE=True,   # required when SameSite=None
+)
 app.secret_key = os.environ.get("FLASK_SECRET", "change-me")
 TOOL_JWKS = {"keys": []}  # replace with  actual tool JWKS later when we start signing responses
 
@@ -41,10 +47,16 @@ def jwks():
     # Serve public keys so Canvas can validate any JWTs (e.g., for Deep Linking responses).
     return jsonify(TOOL_JWKS)
 
+# create a cache instance (lives in memory for dev gets wiped when Flask restarts) -> for prod we need something that survives across processes
+app.config["CACHE_TYPE"] = "SimpleCache"
+app_cache = Cache(app)
+
+cache = FlaskCacheDataStorage(app_cache)
 
 @app.route("/lti/oidc-login", methods=["POST"])
 def oidc_login():
-    login = FlaskOIDCLogin(FlaskRequest(), tool_conf)
+    req = FlaskRequest()
+    login = FlaskOIDCLogin(req, tool_conf, launch_data_storage=cache)
     # The library reads iss/login_hint/lti_message_hint from the request object
     target_link_uri = request.form["target_link_uri"]
     return login.redirect(target_link_uri)    # only pass the target link URI
@@ -52,10 +64,13 @@ def oidc_login():
 
 @app.route("/lti/launch", methods=["POST"])
 def launch():
+    req = FlaskRequest()
     # Validate id_token (signature, iss/aud/exp, state/nonce)
-    ml = FlaskMessageLaunch(FlaskRequest(), tool_conf).validate()
-    launch_data = ml.get_launch_data()
-    # TODO: persist ml/launch_data for later AGS calls: ml.get_ags(), ml.get_nrps()
+    ml = FlaskMessageLaunch(
+        req,
+        tool_conf,
+        launch_data_storage=cache
+    ).validate()
     # For now, just confirm it worked.
     return jsonify({
         "status": "ok",
@@ -74,6 +89,12 @@ def health():
         "endpoints": ["/jwks.json", "POST /oidc-login", "POST /launch"]
     })
 
+@app.after_request
+def add_csp(resp):
+    resp.headers["Content-Security-Policy"] = (
+        "frame-ancestors https://*.instructure.com https://*.canvaslms.com;"
+    )
+    return resp
 
 if __name__ == "__main__":
     app.run(host="0.0.0.0", port=int(os.environ.get("PORT", 8080)))
