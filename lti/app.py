@@ -6,7 +6,7 @@ from pylti1p3.contrib.flask import (
 )
 from pylti1p3.tool_config import ToolConfDict
 
-load_dotenv("/.env")
+load_dotenv(".env")
 
 # ---- Tool Configuration ----- #
 ISSUER = "https://canvas.instructure.com"
