@@ -6,72 +6,119 @@ from pylti1p3.contrib.flask import (
 )
 from pylti1p3.tool_config import ToolConfDict
 from flask_caching import Cache
+from werkzeug.middleware.proxy_fix import ProxyFix
 
 
 load_dotenv(".env")
 
 # ---- Tool Configuration ----- #
-ISSUER = "https://canvas.instructure.com"
+TENANT_ISS = os.environ.get("CANVAS_ISSUER", "https://ufl.instructure.com")
+GLOBAL_ISS = "https://canvas.instructure.com"  # Canvas sometimes uses this for iss
+
+def _env_csv(name):
+    v = os.environ.get(name, "")
+    return [s.strip() for s in v.split(",") if s.strip()]
+
+DEPLOY_IDS = _env_csv("CANVAS_DEPLOYMENT_ID")
+
+REG = {
+    "default": True,
+    "client_id": os.environ["CANVAS_CLIENT_ID"],
+    # keep these pointing to your actual Canvas tenant endpoints
+    "auth_login_url": os.environ["CANVAS_OIDC_AUTH_URL"],
+    "auth_token_url": os.environ["CANVAS_TOKEN_URL"],
+    "auth_audience": os.environ.get("CANVAS_TOKEN_AUDIENCE"),
+    "key_set_url": os.environ["CANVAS_JWKS_URL"],
+    "deployment_ids": [os.environ.get("CANVAS_DEPLOYMENT_ID", "")]
+}
 
 tool_conf = ToolConfDict({
-    ISSUER: [{
-        "default": True,
-        "client_id": os.environ["CANVAS_CLIENT_ID"],
-        "auth_login_url": os.environ["CANVAS_OIDC_AUTH_URL"],
-        "auth_token_url": os.environ["CANVAS_TOKEN_URL"],
-        "auth_audience": os.environ.get("CANVAS_TOKEN_AUDIENCE"),  # often same as token URL; ok if missing
-        "key_set_url": os.environ["CANVAS_JWKS_URL"],
-        # For deep linking / tool-signed JWTs, set one of the following:
-        # "private_key_file": "config/private.key",
-        # "public_key_file": "config/public.key",
-        # or inline:
-        # "private_key": os.environ.get("TOOL_PRIVATE_KEY_PEM"),
-        # "public_key": os.environ.get("TOOL_PUBLIC_KEY_PEM"),
-        "deployment_ids": [os.environ.get("CANVAS_DEPLOYMENT_ID", "")]  # optional but recommended
-    }]
+    TENANT_ISS: [REG],
+    GLOBAL_ISS: [REG],   
 })
+
+print("Configured issuers:", [TENANT_ISS, GLOBAL_ISS])
+print("Configured client_id:", REG["client_id"])
+print("Configured deployment_ids:", DEPLOY_IDS)
 
 
 # ---- Flask App ---- #
 app = Flask(__name__)
+app.wsgi_app = ProxyFix(app.wsgi_app, x_for=1, x_proto=1, x_host=1, x_port=1)
 app.config.update(
+    PREFERRED_URL_SCHEME="https",   
+    SESSION_COOKIE_DOMAIN=".gradewise.org",  
     SESSION_COOKIE_SAMESITE="None",
-    SESSION_COOKIE_SECURE=True,   # required when SameSite=None
+    SESSION_COOKIE_SECURE=True,
 )
 app.secret_key = os.environ.get("FLASK_SECRET", "change-me")
 TOOL_JWKS = {"keys": []}  # replace with  actual tool JWKS later when we start signing responses
 
 
+# -- Cache Instance -- #
+# create a cache instance (lives in memory for dev gets wiped when Flask restarts) -> for prod we need something that survives across processes like Redis/Memcached
+app.config["CACHE_TYPE"] = "SimpleCache"
+app_cache = Cache(app)
+
+launch_store = FlaskCacheDataStorage(app_cache)
+
+# -- ENDPOINTS -- #
 @app.route("/lti/jwks.json")
 def jwks():
     # Serve public keys so Canvas can validate any JWTs (e.g., for Deep Linking responses).
     return jsonify(TOOL_JWKS)
 
-# create a cache instance (lives in memory for dev gets wiped when Flask restarts) -> for prod we need something that survives across processes
-app.config["CACHE_TYPE"] = "SimpleCache"
-app_cache = Cache(app)
 
-cache = FlaskCacheDataStorage(app_cache)
 
-@app.route("/lti/oidc-login", methods=["POST"])
+@app.route("/lti/oidc-login", methods=["GET", "POST"])
 def oidc_login():
     req = FlaskRequest()
-    login = FlaskOIDCLogin(req, tool_conf, launch_data_storage=cache)
-    # The library reads iss/login_hint/lti_message_hint from the request object
-    target_link_uri = request.form["target_link_uri"]
-    return login.redirect(target_link_uri)    # only pass the target link URI
+    try:
+        # Log what Canvas actually sent (works for GET or POST)
+        print("OIDC iss:", req.get_param("iss"), " client_id:", req.get_param("client_id"))
+
+        login = FlaskOIDCLogin(
+            req,
+            tool_conf,
+            launch_data_storage=launch_store
+        ).enable_check_cookies()
+
+        target_link_uri = req.get_param("target_link_uri")
+        if not target_link_uri:
+            # Canvas must send this; bail early with detail if missing
+            return jsonify({"error": "missing target_link_uri"}), 400
+
+        # Always redirect (both on POST and on the GET preflight)
+        return login.redirect(target_link_uri)
+
+    except Exception as e:
+        # Show the *real* reason for the 400 you’re seeing
+        print("OIDC ERROR:", type(e).__name__, str(e))
+        return jsonify({"status": "error", "error": type(e).__name__, "message": str(e)}), 400
+
 
 
 @app.route("/lti/launch", methods=["POST"])
 def launch():
     req = FlaskRequest()
-    # Validate id_token (signature, iss/aud/exp, state/nonce)
+    print("Launch iss:", req.get_param("iss"), " client_id:", req.get_param("client_id"))
+    print("Launch state:", req.get_param("state"))
+
+    # DEV DEBUG ONLY: dump cache keys to verify the state is there
+    try:
+        keys = list(getattr(app_cache.cache, "_cache", {}).keys())
+        print("Cache keys (dev):", keys[:10])
+    except Exception as _:
+        pass
+
     ml = FlaskMessageLaunch(
         req,
         tool_conf,
-        launch_data_storage=cache
+        launch_data_storage=launch_store
     ).validate()
-    # For now, just confirm it worked.
+
+    launch_data = ml.get_launch_data()
+
     return jsonify({
         "status": "ok",
         "platform": launch_data.get("iss"),
