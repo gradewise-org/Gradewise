@@ -1,0 +1,13 @@
+[Unit]
+Description=LTI service for Gradewise platform
+
+[Service]
+Type=simple
+Environment="PATH=/opt/stacks/gradewise/lti/.venv/bin:$PATH"
+Environment="PORT=8100"
+WorkingDirectory=/opt/stacks/gradewise/lti
+ExecStart=/opt/stacks/gradewise/lti/.venv/bin/python /opt/stacks/gradewise/lti/app.py
+Restart=always
+
+[Install]
+WantedBy=multi-user.target
