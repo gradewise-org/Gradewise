@@ -82,3 +82,15 @@ CREATE TABLE IF NOT EXISTS roster_import_jobs (
 CREATE INDEX IF NOT EXISTS courses_creator_idx     ON courses(creator_faculty_id);
 CREATE INDEX IF NOT EXISTS graders_course_idx      ON course_graders(course_id, faculty_id);
 CREATE INDEX IF NOT EXISTS enrollments_course_idx  ON enrollments(course_id);
+
+-- App role privileges for everything in public schema
+GRANT USAGE ON SCHEMA public TO gradewise_user;
+GRANT SELECT, INSERT, UPDATE, DELETE ON ALL TABLES IN SCHEMA public TO gradewise_user;
+GRANT USAGE, SELECT, UPDATE ON ALL SEQUENCES IN SCHEMA public TO gradewise_user;
+
+-- Ensure future objects created by *postgres* in public auto-grant to app
+ALTER DEFAULT PRIVILEGES FOR USER postgres IN SCHEMA public
+  GRANT SELECT, INSERT, UPDATE, DELETE ON TABLES TO gradewise_user;
+
+ALTER DEFAULT PRIVILEGES FOR USER postgres IN SCHEMA public
+  GRANT USAGE, SELECT, UPDATE ON SEQUENCES TO gradewise_user;
