@@ -33,7 +33,7 @@ func main() {
 	}
 
 	// Build your server with injected deps
-	server := api.NewServer(temporalClient)
+	server := api.NewServer(temporalClient, db)
 
 	r := gin.Default()
 
