@@ -1,5 +1,5 @@
 import os, json
-from flask import Flask, request, jsonify
+from flask import Flask, request, jsonify, redirect, session
 from dotenv import load_dotenv
 from pylti1p3.contrib.flask import (
     FlaskOIDCLogin, FlaskMessageLaunch, FlaskRequest, FlaskCacheDataStorage
@@ -45,12 +45,14 @@ print("Configured deployment_ids:", DEPLOY_IDS)
 # ---- Flask App ---- #
 app = Flask(__name__)
 app.wsgi_app = ProxyFix(app.wsgi_app, x_for=1, x_proto=1, x_host=1, x_port=1)
-app.config.update(
-    PREFERRED_URL_SCHEME="https",   
-    SESSION_COOKIE_DOMAIN=".gradewise.org",  
-    SESSION_COOKIE_SAMESITE="None",
-    SESSION_COOKIE_SECURE=True,
-)
+app.config.update({
+    "PREFERRED_URL_SCHEME": "https",
+    "SESSION_COOKIE_DOMAIN": None,
+    "SESSION_COOKIE_SAMESITE": "None",
+    "SESSION_COOKIE_SECURE": True,
+    "X_FRAME_OPTIONS": None,           # disables Flask default header
+    "TALISMAN_FRAME_OPTIONS": None,    # disables Flask-Talisman frame header
+})
 app.secret_key = os.environ.get("FLASK_SECRET", "change-me")
 TOOL_JWKS = {"keys": []}  # replace with  actual tool JWKS later when we start signing responses
 
@@ -119,6 +121,12 @@ def launch():
 
     launch_data = ml.get_launch_data()
 
+    session["lti_sub"] = launch_data.get("sub")
+    session["lti_context"] = launch_data.get("https://purl.imsglobal.org/spec/lti/claim/context")
+
+    return redirect("/app/") #Redirect to frontend served at /app/
+
+    """
     return jsonify({
         "status": "ok",
         "platform": launch_data.get("iss"),
@@ -126,9 +134,10 @@ def launch():
         "roles": launch_data.get("https://purl.imsglobal.org/spec/lti/claim/roles", []),
         "context": launch_data.get("https://purl.imsglobal.org/spec/lti/claim/context", {})
     })
+    """
 
 # Just a simple Flask health route to confirm everything is working - not needed for LTI but it's handy to have
-@app.route("/lti")
+@app.route("/lti", methods=["GET","HEAD"])
 def health():
     return jsonify({
         "name": "Gradewise LTI",
@@ -136,10 +145,21 @@ def health():
         "endpoints": ["/jwks.json", "POST /oidc-login", "POST /launch"]
     })
 
+@app.before_request
+def _log(): print("LTI hit", request.path)
+
 @app.after_request
 def add_csp(resp):
+    resp.headers.pop("X-Frame-Options", None)
     resp.headers["Content-Security-Policy"] = (
-        "frame-ancestors https://*.instructure.com https://*.canvaslms.com;"
+        "default-src 'self'; "
+        "frame-ancestors https://*.instructure.com https://*.canvaslms.com; "
+        "script-src 'self' 'unsafe-inline'; "
+        "style-src 'self' 'unsafe-inline'; "
+        "img-src 'self' data: blob:; "
+        "font-src 'self' data:; "
+        "connect-src 'self'; "
+        "base-uri 'self'; form-action 'self'"
     )
     return resp
 
