@@ -1,2 +1,6 @@
 .vscode
 lti/.env
+node_modules
+.svelte-kit
+dist
+*.lockb
