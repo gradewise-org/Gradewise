@@ -103,38 +103,24 @@ def oidc_login():
 @app.route("/lti/launch", methods=["POST"])
 def launch():
     req = FlaskRequest()
-    print("Launch iss:", req.get_param("iss"), " client_id:", req.get_param("client_id"))
-    print("Launch state:", req.get_param("state"))
-
-    # DEV DEBUG ONLY: dump cache keys to verify the state is there
     try:
-        keys = list(getattr(app_cache.cache, "_cache", {}).keys())
-        print("Cache keys (dev):", keys[:10])
-    except Exception as _:
-        pass
-
-    ml = FlaskMessageLaunch(
-        req,
-        tool_conf,
-        launch_data_storage=launch_store
-    ).validate()
+        ml = FlaskMessageLaunch(req, tool_conf, launch_data_storage=launch_store).validate()
+    except Exception as e:
+        app.logger.exception("LTI launch validate failed")
+        return jsonify({"status": "error", "message": str(e)}), 400
 
     launch_data = ml.get_launch_data()
-
     session["lti_sub"] = launch_data.get("sub")
     session["lti_context"] = launch_data.get("https://purl.imsglobal.org/spec/lti/claim/context")
-
-    return redirect("/app/") #Redirect to frontend served at /app/
-
-    """
-    return jsonify({
-        "status": "ok",
-        "platform": launch_data.get("iss"),
-        "user_sub": launch_data.get("sub"),
-        "roles": launch_data.get("https://purl.imsglobal.org/spec/lti/claim/roles", []),
-        "context": launch_data.get("https://purl.imsglobal.org/spec/lti/claim/context", {})
-    })
-    """
+    resp = redirect("/app/")
+    resp.set_cookie(
+    "launched", "1",
+    path="/",
+    secure=True,
+    samesite="None",
+    max_age=3600
+    )
+    return resp
 
 # Just a simple Flask health route to confirm everything is working - not needed for LTI but it's handy to have
 @app.route("/lti", methods=["GET","HEAD"])
