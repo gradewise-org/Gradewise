@@ -9,8 +9,9 @@ export default defineConfig({
 		host: true, port: 8080, strictPort: true,
 		allowedHosts: ['dev.gradewise.org','jon-dev.gradewise.org'],
 		origin: 'https://dev.gradewise.org',
-		hmr: { protocol: 'wss', host: 'dev.gradewise.org', port: 443 }
+		hmr: { protocol: 'wss', host: 'localhost', port: 8080 }
 	  },
+	preview: { port: 8080},
 
 	test: {
 		workspace: [
