@@ -5,6 +5,13 @@ import { defineConfig } from 'vite';
 
 export default defineConfig({
 	plugins: [tailwindcss(), sveltekit()],
+	server: {
+		host: true, port: 8080, strictPort: true,
+		allowedHosts: ['dev.gradewise.org','jon-dev.gradewise.org'],
+		origin: 'https://dev.gradewise.org',
+		hmr: { protocol: 'wss', host: 'dev.gradewise.org', port: 443 }
+	  },
+
 	test: {
 		workspace: [
 			{
