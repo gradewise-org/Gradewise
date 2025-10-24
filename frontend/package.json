@@ -6,7 +6,7 @@
 	"scripts": {
 		"dev": "bunx svelte-kit dev",
 		"build": "bunx svelte-kit build",
-		"preview": "node build",
+		"preview": "bunx svelte-kit preview",
 		"prepare": "svelte-kit sync || echo ''",
 		"check": "svelte-kit sync && svelte-check --tsconfig ./tsconfig.json",
 		"check:watch": "svelte-kit sync && svelte-check --tsconfig ./tsconfig.json --watch",
