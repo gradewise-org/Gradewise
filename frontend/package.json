@@ -4,7 +4,7 @@
 	"version": "0.0.1",
 	"type": "module",
 	"scripts": {
-		"dev": "vite dev",
+		"dev": "bunx svelte-kit dev",
 		"build": "bunx svelte-kit build",
 		"preview": "node build",
 		"prepare": "svelte-kit sync || echo ''",
