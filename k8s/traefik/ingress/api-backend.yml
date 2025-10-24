@@ -4,11 +4,12 @@ metadata:
   name: api-backend-ingress
 
 spec:
-  entryPoints:
-    - http
+  entryPoints: [web, websecure]
+  tls : {}
   routes:
     - match: PathPrefix(`/api`)
       kind: Rule
+      priority: 100      # beats the root (which has default 0)
       services:
         - name: gradewise-api-backend
           port: web
