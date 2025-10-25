@@ -1,4 +1,3 @@
-LOCAL_PORT = 3000
 DEV = 'true'
 
 # Load extensions
@@ -71,7 +70,7 @@ docker_build(
         sync('./frontend', '/app')
     ],
     build_args={
-        'BASE_URL': 'http://localhost:%d' % LOCAL_PORT,
+        'BASE_URL': 'http://localhost:%d' % 8080,
         'DEV': DEV
     },
 )
@@ -144,6 +143,6 @@ k8s_resource(
 # Main Application Gateway
 k8s_resource(
     'traefik-deployment',
-    port_forwards=['%d:80' % LOCAL_PORT, '8080:8080'],  # App traffic, Traefik dashboard
-    resource_deps=['gradewise-frontend', 'gradewise-api-backend']
+    port_forwards=['8080:80', '3000:8080'],
+    resource_deps=['gradewise-frontend','gradewise-api-backend']
 )

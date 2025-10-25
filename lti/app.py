@@ -1,5 +1,5 @@
 import os, json
-from flask import Flask, request, jsonify
+from flask import Flask, request, jsonify, redirect, session
 from dotenv import load_dotenv
 from pylti1p3.contrib.flask import (
     FlaskOIDCLogin, FlaskMessageLaunch, FlaskRequest, FlaskCacheDataStorage
@@ -15,21 +15,24 @@ load_dotenv(".env")
 TENANT_ISS = os.environ.get("CANVAS_ISSUER", "https://ufl.instructure.com")
 GLOBAL_ISS = "https://canvas.instructure.com"  # Canvas sometimes uses this for iss
 
-def _env_csv(name):
-    v = os.environ.get(name, "")
-    return [s.strip() for s in v.split(",") if s.strip()]
+def require_env(name):
+    value = os.getenv(name)
+    if not value:
+        raise RuntimeError(f"Missing required environment variable: {name}")
+    return value
 
-DEPLOY_IDS = _env_csv("CANVAS_DEPLOYMENT_ID")
+DEPLOY_IDS = require_env("CANVAS_DEPLOYMENT_ID")
+
+DEPLOY_ID = require_env("CANVAS_DEPLOYMENT_ID")
 
 REG = {
     "default": True,
-    "client_id": os.environ["CANVAS_CLIENT_ID"],
-    # keep these pointing to your actual Canvas tenant endpoints
-    "auth_login_url": os.environ["CANVAS_OIDC_AUTH_URL"],
-    "auth_token_url": os.environ["CANVAS_TOKEN_URL"],
-    "auth_audience": os.environ.get("CANVAS_TOKEN_AUDIENCE"),
-    "key_set_url": os.environ["CANVAS_JWKS_URL"],
-    "deployment_ids": [os.environ.get("CANVAS_DEPLOYMENT_ID", "")]
+    "client_id": require_env("CANVAS_CLIENT_ID"),
+    "auth_login_url": require_env("CANVAS_OIDC_AUTH_URL"),
+    "auth_token_url": require_env("CANVAS_TOKEN_URL"),
+    "auth_audience": os.getenv("CANVAS_TOKEN_AUDIENCE"),
+    "key_set_url": require_env("CANVAS_JWKS_URL"),
+    "deployment_ids": [DEPLOY_ID],
 }
 
 tool_conf = ToolConfDict({
@@ -45,12 +48,14 @@ print("Configured deployment_ids:", DEPLOY_IDS)
 # ---- Flask App ---- #
 app = Flask(__name__)
 app.wsgi_app = ProxyFix(app.wsgi_app, x_for=1, x_proto=1, x_host=1, x_port=1)
-app.config.update(
-    PREFERRED_URL_SCHEME="https",   
-    SESSION_COOKIE_DOMAIN=".gradewise.org",  
-    SESSION_COOKIE_SAMESITE="None",
-    SESSION_COOKIE_SECURE=True,
-)
+app.config.update({
+    "PREFERRED_URL_SCHEME": "https",
+    "SESSION_COOKIE_DOMAIN": None,
+    "SESSION_COOKIE_SAMESITE": "None",
+    "SESSION_COOKIE_SECURE": True,
+    "X_FRAME_OPTIONS": None,           # disables Flask default header
+    "TALISMAN_FRAME_OPTIONS": None,    # disables Flask-Talisman frame header
+})
 app.secret_key = os.environ.get("FLASK_SECRET", "change-me")
 TOOL_JWKS = {"keys": []}  # replace with  actual tool JWKS later when we start signing responses
 
@@ -101,34 +106,27 @@ def oidc_login():
 @app.route("/lti/launch", methods=["POST"])
 def launch():
     req = FlaskRequest()
-    print("Launch iss:", req.get_param("iss"), " client_id:", req.get_param("client_id"))
-    print("Launch state:", req.get_param("state"))
-
-    # DEV DEBUG ONLY: dump cache keys to verify the state is there
     try:
-        keys = list(getattr(app_cache.cache, "_cache", {}).keys())
-        print("Cache keys (dev):", keys[:10])
-    except Exception as _:
-        pass
-
-    ml = FlaskMessageLaunch(
-        req,
-        tool_conf,
-        launch_data_storage=launch_store
-    ).validate()
+        ml = FlaskMessageLaunch(req, tool_conf, launch_data_storage=launch_store).validate()
+    except Exception as e:
+        app.logger.exception("LTI launch validate failed")
+        return jsonify({"status": "error", "message": str(e)}), 400
 
     launch_data = ml.get_launch_data()
-
-    return jsonify({
-        "status": "ok",
-        "platform": launch_data.get("iss"),
-        "user_sub": launch_data.get("sub"),
-        "roles": launch_data.get("https://purl.imsglobal.org/spec/lti/claim/roles", []),
-        "context": launch_data.get("https://purl.imsglobal.org/spec/lti/claim/context", {})
-    })
+    session["lti_sub"] = launch_data.get("sub")
+    session["lti_context"] = launch_data.get("https://purl.imsglobal.org/spec/lti/claim/context")
+    resp = redirect("/app/")
+    resp.set_cookie(
+    "launched", "1",
+    path="/",
+    secure=True,
+    samesite="None",
+    max_age=3600
+    )
+    return resp
 
 # Just a simple Flask health route to confirm everything is working - not needed for LTI but it's handy to have
-@app.route("/lti")
+@app.route("/lti", methods=["GET","HEAD"])
 def health():
     return jsonify({
         "name": "Gradewise LTI",
@@ -136,10 +134,21 @@ def health():
         "endpoints": ["/jwks.json", "POST /oidc-login", "POST /launch"]
     })
 
+@app.before_request
+def _log(): print("LTI hit", request.path)
+
 @app.after_request
 def add_csp(resp):
+    resp.headers.pop("X-Frame-Options", None)
     resp.headers["Content-Security-Policy"] = (
-        "frame-ancestors https://*.instructure.com https://*.canvaslms.com;"
+        "default-src 'self'; "
+        "frame-ancestors https://*.instructure.com https://*.canvaslms.com; "
+        "script-src 'self' 'unsafe-inline'; "
+        "style-src 'self' 'unsafe-inline'; "
+        "img-src 'self' data: blob:; "
+        "font-src 'self' data:; "
+        "connect-src 'self'; "
+        "base-uri 'self'; form-action 'self'"
     )
     return resp
 

@@ -1,11 +1,8 @@
 apiVersion: traefik.io/v1alpha1
 kind: IngressRoute
-metadata:
-  name: frontend-ingress
-
+metadata: { name: frontend-ingress }
 spec:
-  entryPoints:
-    - http
+  entryPoints: [web, websecure]
   routes:
     - match: PathPrefix(`/`)
       kind: Rule

@@ -2,12 +2,9 @@
 	import { PUBLIC_BASE_URL } from '$env/static/public';
 	import type { PageProps } from './$types';
 	import { onMount } from 'svelte';
-
 	let { data }: PageProps = $props();
-
 	let count = $state(0);
 	let healthStatus = $state('Loading...');
-
 	onMount(() => {
 		const updateHealth = async () => {
 			try {
@@ -17,10 +14,8 @@
 				healthStatus = 'Error fetching health status';
 			}
 		};
-
 		updateHealth();
 		const interval = setInterval(updateHealth, 1000);
-
 		return () => clearInterval(interval);
 	});
 </script>
