@@ -24,7 +24,7 @@
   
   <div class="m-1">
 	<h1>Welcome to SvelteKit</h1>
-	<button class="rounded-md bg-blue-500 p-2 text-white" onclick={() => (count += 1)}>
+	<button class="rounded-md bg-blue-500 p-2 text-white" on:click={() => (count += 1)}>
 	  I've been clicked {count} times
 	</button>
   
