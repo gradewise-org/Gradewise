@@ -46,6 +46,8 @@ data:
     GRANT ALL PRIVILEGES ON SCHEMA public TO temporal_user;
     \c temporal_visibility;
     GRANT ALL PRIVILEGES ON SCHEMA public TO temporal_user;
+    
+    \c gradewise_api;
     -- UUID generator
     CREATE
     EXTENSION IF NOT EXISTS pgcrypto;
