@@ -2,9 +2,9 @@ apiVersion: traefik.io/v1alpha1
 kind: IngressRoute
 metadata: { name: frontend-ingress }
 spec:
-  entryPoints: [web]
+  entryPoints: [web, websecure]
   routes:
-    - match: Host(`dev.gradewise.org`) && PathPrefix(`/`)
+    - match: PathPrefix(`/`)
       kind: Rule
       services:
         - name: gradewise-frontend

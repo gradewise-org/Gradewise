@@ -2,12 +2,12 @@ apiVersion: traefik.io/v1alpha1
 kind: IngressRoute
 metadata: { name: lti-ingress }
 spec:
-  entryPoints: [websecure]
+  entryPoints: [web, websecure]
   tls: {}
   routes:
-    - match: (Host(`dev.gradewise.org`) || Host(`jon-dev.gradewise.org`)) && PathPrefix(`/lti`)
+    - match: PathPrefix(`/lti`)
       kind: Rule
       priority: 10000
       services:
         - name: gradewise-lti
-          port: 8080
+          port: web

@@ -3,6 +3,7 @@ import { svelteTesting } from '@testing-library/svelte/vite';
 import { sveltekit } from '@sveltejs/kit/vite';
 import { defineConfig } from 'vite';
 
+//TODO: Read data from env variables during build (add variable in Tiltfile)
 export default defineConfig({
 	plugins: [tailwindcss(), sveltekit()],
 	server: {

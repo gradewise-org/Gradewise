@@ -15,21 +15,24 @@ load_dotenv(".env")
 TENANT_ISS = os.environ.get("CANVAS_ISSUER", "https://ufl.instructure.com")
 GLOBAL_ISS = "https://canvas.instructure.com"  # Canvas sometimes uses this for iss
 
-def _env_csv(name):
-    v = os.environ.get(name, "")
-    return [s.strip() for s in v.split(",") if s.strip()]
+def require_env(name):
+    value = os.getenv(name)
+    if not value:
+        raise RuntimeError(f"Missing required environment variable: {name}")
+    return value
 
-DEPLOY_IDS = _env_csv("CANVAS_DEPLOYMENT_ID")
+DEPLOY_IDS = require_env("CANVAS_DEPLOYMENT_ID")
+
+DEPLOY_ID = require_env("CANVAS_DEPLOYMENT_ID")
 
 REG = {
     "default": True,
-    "client_id": os.environ["CANVAS_CLIENT_ID"],
-    # keep these pointing to your actual Canvas tenant endpoints
-    "auth_login_url": os.environ["CANVAS_OIDC_AUTH_URL"],
-    "auth_token_url": os.environ["CANVAS_TOKEN_URL"],
-    "auth_audience": os.environ.get("CANVAS_TOKEN_AUDIENCE"),
-    "key_set_url": os.environ["CANVAS_JWKS_URL"],
-    "deployment_ids": [os.environ.get("CANVAS_DEPLOYMENT_ID", "")]
+    "client_id": require_env("CANVAS_CLIENT_ID"),
+    "auth_login_url": require_env("CANVAS_OIDC_AUTH_URL"),
+    "auth_token_url": require_env("CANVAS_TOKEN_URL"),
+    "auth_audience": os.getenv("CANVAS_TOKEN_AUDIENCE"),
+    "key_set_url": require_env("CANVAS_JWKS_URL"),
+    "deployment_ids": [DEPLOY_ID],
 }
 
 tool_conf = ToolConfDict({
