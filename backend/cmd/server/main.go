@@ -36,7 +36,7 @@ func main() {
 	server := api.NewServer(temporalClient, db)
 
 	r := gin.Default()
-
+	r.Use(api.DevAuth())
 	// Health and monitoring endpoints
 	r.GET("/", func(c *gin.Context) {
 		c.String(http.StatusOK, "Hello, World!")
