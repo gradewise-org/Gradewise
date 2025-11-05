@@ -63,9 +63,12 @@ TOOL_JWKS = {"keys": []}  # replace with  actual tool JWKS later when we start s
 
 # -- Cache Instance -- #
 # create a cache instance (lives in memory for dev gets wiped when Flask restarts) -> for prod we need something that survives across processes like Redis/Memcached
-app.config["CACHE_TYPE"] = "SimpleCache"
+app.config.update({
+    "CACHE_TYPE": "RedisCache",
+    "CACHE_REDIS_URL": os.environ.get("REDIS_URL", "redis://redis:6379/0"),
+    "CACHE_DEFAULT_TIMEOUT": 900  
+})
 app_cache = Cache(app)
-
 launch_store = FlaskCacheDataStorage(app_cache)
 
 # -- ENDPOINTS -- #
@@ -133,7 +136,7 @@ def cookie_init():
     resp = make_response(redirect(ret))
     _set_partitioned(resp, "__Host-gw_sid", sid, 900)
     return resp
-    
+
 # Just a simple Flask health route to confirm everything is working - not needed for LTI but it's handy to have
 @app.route("/lti", methods=["GET","HEAD"])
 def health():

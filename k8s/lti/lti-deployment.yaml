@@ -17,9 +17,10 @@ spec:
             - name: web
               containerPort: 8080
           env:
-            # Non-secret runtime flags
             - name: PORT
               value: "8080"
+            - name: REDIS_URL
+              value: redis://redis:6379/0
             - name: FLASK_SECRET
               valueFrom:
                 secretKeyRef:
@@ -55,8 +56,6 @@ spec:
                 secretKeyRef:
                   name: gradewise-lti-secrets
                   key: CANVAS_JWKS_URL
-            - name: SESSION_COOKIE_DOMAIN
-              value: ".gradewise.org"
             
 ---
 apiVersion: v1
