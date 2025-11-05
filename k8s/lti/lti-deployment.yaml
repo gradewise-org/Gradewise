@@ -16,6 +16,48 @@ spec:
           ports:
             - name: web
               containerPort: 8080
+          env:
+            # Non-secret runtime flags
+            - name: PORT
+              value: "8080"
+            - name: FLASK_SECRET
+              valueFrom:
+                secretKeyRef:
+                  name: gradewise-lti-secrets
+                  key: FLASK_SECRET
+            - name: CANVAS_CLIENT_ID
+              valueFrom:
+                secretKeyRef:
+                  name: gradewise-lti-secrets
+                  key: CANVAS_CLIENT_ID
+            - name: CANVAS_DEPLOYMENT_ID
+              valueFrom:
+                secretKeyRef:
+                  name: gradewise-lti-secrets
+                  key: CANVAS_DEPLOYMENT_ID
+            - name: CANVAS_ISSUER
+              valueFrom:
+                secretKeyRef:
+                  name: gradewise-lti-secrets
+                  key: CANVAS_ISSUER
+            - name: CANVAS_OIDC_AUTH_URL
+              valueFrom:
+                secretKeyRef:
+                  name: gradewise-lti-secrets
+                  key: CANVAS_OIDC_AUTH_URL
+            - name: CANVAS_TOKEN_URL
+              valueFrom:
+                secretKeyRef:
+                  name: gradewise-lti-secrets
+                  key: CANVAS_TOKEN_URL
+            - name: CANVAS_JWKS_URL
+              valueFrom:
+                secretKeyRef:
+                  name: gradewise-lti-secrets
+                  key: CANVAS_JWKS_URL
+            - name: SESSION_COOKIE_DOMAIN
+              value: ".gradewise.org"
+            
 ---
 apiVersion: v1
 kind: Service
@@ -26,5 +68,5 @@ spec:
   selector: { app: gradewise-lti }
   ports:
     - name: web
-      port: 8080
-      targetPort: http
+      port: 80
+      targetPort: 8080

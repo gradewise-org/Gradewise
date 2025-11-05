@@ -75,6 +75,13 @@ docker_build(
     },
 )
 
+# LTI Image Build
+docker_build(
+    'gradewise-lti',
+    './lti',
+    dockerfile="./lti/Dockerfile"
+)
+
 # -> Reinstall package dependencies
 cmd_button(
     'gradewise-frontend:bun install',
@@ -104,8 +111,10 @@ k8s_yaml('k8s/backend/temporal-server-deployment.yaml')
 k8s_yaml('k8s/backend/api-backend-deployment.yaml')
 k8s_yaml('k8s/backend/temporal-worker-deployment.yaml')
 k8s_yaml('k8s/frontend/frontend-deployment.yaml')
+k8s_yaml('k8s/lti/lti-deployment.yaml')
 
 # Traefik Ingress Controller
+k8s_yaml('k8s/traefik/crds.yaml')
 k8s_yaml('k8s/traefik/role.yml')
 k8s_yaml('k8s/traefik/account.yml')
 k8s_yaml('k8s/traefik/role-binding.yml')
@@ -115,6 +124,7 @@ k8s_yaml('k8s/traefik/traefik-services.yml')
 # Ingress Routes
 k8s_yaml('k8s/traefik/ingress/api-backend.yml')
 k8s_yaml('k8s/traefik/ingress/frontend.yml')
+k8s_yaml('k8s/traefik/ingress/lti.yml')
 
 
 # Resource Dependencies and Port Forwards
