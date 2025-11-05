@@ -1,5 +1,6 @@
 import os, json
-from flask import Flask, request, jsonify, redirect, session
+import secrets
+from flask import Flask, request, jsonify, redirect, session, make_response
 from dotenv import load_dotenv
 from pylti1p3.contrib.flask import (
     FlaskOIDCLogin, FlaskMessageLaunch, FlaskRequest, FlaskCacheDataStorage
@@ -75,56 +76,64 @@ def jwks():
 
 
 
-@app.route("/lti/oidc-login", methods=["GET", "POST"])
+def _harden_state_cookie(resp):
+    cookies = resp.headers.getlist("Set-Cookie")
+    resp.headers.set("Set-Cookie", "")
+    for c in cookies:
+        if c.startswith("lti1p3-state-"):
+            if "SameSite=None" not in c: c += "; SameSite=None"
+            if "Secure" not in c: c += "; Secure"
+            if "Path=" not in c: c += "; Path=/"
+        resp.headers.add("Set-Cookie", c)
+    return resp
+
+@app.route("/lti/oidc-login", methods=["GET","POST"])
 def oidc_login():
     req = FlaskRequest()
-    try:
-        # Log what Canvas actually sent (works for GET or POST)
-        print("OIDC iss:", req.get_param("iss"), " client_id:", req.get_param("client_id"))
-
-        login = FlaskOIDCLogin(
-            req,
-            tool_conf,
-            launch_data_storage=launch_store
-        ).enable_check_cookies()
-
-        target_link_uri = req.get_param("target_link_uri")
-        if not target_link_uri:
-            # Canvas must send this; bail early with detail if missing
-            return jsonify({"error": "missing target_link_uri"}), 400
-
-        # Always redirect (both on POST and on the GET preflight)
-        return login.redirect(target_link_uri)
-
-    except Exception as e:
-        # Show the *real* reason for the 400 you’re seeing
-        print("OIDC ERROR:", type(e).__name__, str(e))
-        return jsonify({"status": "error", "error": type(e).__name__, "message": str(e)}), 400
+    login = FlaskOIDCLogin(req, tool_conf, launch_data_storage=launch_store)
+    target_link_uri = req.get_param("target_link_uri")
+    if not target_link_uri: return jsonify({"error":"missing target_link_uri"}), 400
+    resp = login.redirect(target_link_uri)
+    return _harden_state_cookie(resp)
 
 
+
+COOKIE_NAME = "__Host-gw_sid"
+
+def _set_partitioned(resp, name, value, max_age):
+    resp.set_cookie(name, value, max_age=max_age, path="/",
+                    secure=True, httponly=True, samesite="None")
+    # append Partitioned
+    cookies = resp.headers.getlist("Set-Cookie")
+    resp.headers.set("Set-Cookie", "")
+    for c in cookies:
+        if c.startswith(f"{name}=") and "Partitioned" not in c:
+            c += "; Partitioned"
+        resp.headers.add("Set-Cookie", c)
+    return resp
 
 @app.route("/lti/launch", methods=["POST"])
 def launch():
     req = FlaskRequest()
-    try:
-        ml = FlaskMessageLaunch(req, tool_conf, launch_data_storage=launch_store).validate()
-    except Exception as e:
-        app.logger.exception("LTI launch validate failed")
-        return jsonify({"status": "error", "message": str(e)}), 400
+    ml = FlaskMessageLaunch(req, tool_conf, launch_data_storage=launch_store).validate()
 
-    launch_data = ml.get_launch_data()
-    session["lti_sub"] = launch_data.get("sub")
-    session["lti_context"] = launch_data.get("https://purl.imsglobal.org/spec/lti/claim/context")
-    resp = redirect("/app/")
-    resp.set_cookie(
-    "launched", "1",
-    path="/",
-    secure=True,
-    samesite="None",
-    max_age=3600
-    )
+    # issue your own sid and cache launch data keyed by it
+    sid = secrets.token_urlsafe(32)
+    app_cache.set(f"sid:{sid}", ml.get_launch_data(), timeout=3600)
+
+    resp = make_response(redirect("https://dev.gradewise.org/app"))
+    _set_partitioned(resp, COOKIE_NAME, sid, 3600)
     return resp
 
+@app.route("/lti/cookie-init")
+def cookie_init():
+    ret = request.args.get("return", "https://dev.gradewise.org/app")
+    sid = secrets.token_urlsafe(32)
+    app_cache.set(f"sid:{sid}", {"boot": True}, timeout=900)
+    resp = make_response(redirect(ret))
+    _set_partitioned(resp, "__Host-gw_sid", sid, 900)
+    return resp
+    
 # Just a simple Flask health route to confirm everything is working - not needed for LTI but it's handy to have
 @app.route("/lti", methods=["GET","HEAD"])
 def health():
