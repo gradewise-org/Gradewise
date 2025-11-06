@@ -1,11 +1,11 @@
+# k8s/traefik/ingress/lti.yml
 apiVersion: traefik.io/v1alpha1
 kind: IngressRoute
 metadata: { name: lti-ingress }
 spec:
   entryPoints: [web, websecure]
-  tls: {}
   routes:
-    - match: PathPrefix(`/lti`)
+    - match: Host(`dev.gradewise.org`) && PathPrefix(`/lti`)
       kind: Rule
       priority: 10000
       services:

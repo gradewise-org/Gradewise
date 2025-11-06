@@ -1,51 +1,36 @@
 <script lang="ts">
 	import { PUBLIC_BASE_URL } from '$env/static/public';
-	import type { PageProps } from './$types';
+	import type { PageData } from './$types';
 	import { onMount } from 'svelte';
-	let { data }: PageProps = $props();
-	let count = $state(0);
-	let healthStatus = $state('Loading...');
+  
+	export let data: PageData;   
+	let count = 0;               
+	let healthStatus = 'Loading...'; 
+  
 	onMount(() => {
-		const updateHealth = async () => {
-			try {
-				const response = await fetch(`${PUBLIC_BASE_URL}/api/health`);
-				healthStatus = (await response.text()) + ' - ' + new Date().toLocaleTimeString();
-			} catch (error) {
-				healthStatus = 'Error fetching health status';
-			}
-		};
-		updateHealth();
-		const interval = setInterval(updateHealth, 1000);
-		return () => clearInterval(interval);
+	  const updateHealth = async () => {
+		try {
+		  const r = await fetch(`${PUBLIC_BASE_URL}/api/health`);
+		  healthStatus = (await r.text()) + ' - ' + new Date().toLocaleTimeString();
+		} catch {
+		  healthStatus = 'Error fetching health status';
+		}
+	  };
+	  updateHealth();
+	  const t = setInterval(updateHealth, 1000);
+	  return () => clearInterval(t);
 	});
-</script>
-
-<div class="m-1">
+  </script>
+  
+  <div class="m-1">
 	<h1>Welcome to SvelteKit</h1>
-	<p>
-		Visit <a href="https://svelte.dev/docs/kit">svelte.dev/docs/kit</a> to read the documentation
-	</p>
-
-	<hr class="my-2" />
-
-	<div class="flex flex-col gap-4">
-		<button
-			onclick={() => {
-				count += 1;
-			}}
-			class="rounded-md bg-blue-500 p-2 text-white"
-		>
-			I've been clicked {count} times
-		</button>
-
-		<div>
-			<h2>Data from the server (server-side fetch)</h2>
-			<pre>{data.message}</pre>
-		</div>
-
-		<div>
-			<h2>Health Status (client-side fetch)</h2>
-			<pre>{healthStatus}</pre>
-		</div>
-	</div>
-</div>
+	<button class="rounded-md bg-blue-500 p-2 text-white" on:click={() => (count += 1)}>
+	  I've been clicked {count} times
+	</button>
+  
+	<h2>Data from the server</h2>
+	<pre>{data.message}</pre>
+  
+	<h2>Health Status</h2>
+	<pre>{healthStatus}</pre>
+  </div>
