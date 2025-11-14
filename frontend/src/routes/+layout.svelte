@@ -1,5 +1,6 @@
 <script lang="ts">
   import { onMount } from 'svelte';
+  import { base } from '$app/paths';
   import '../app.css';
 
   const COOKIE = '__Host-gw_sid';
@@ -10,8 +11,11 @@
       try {
         // @ts-ignore
         const has = await document.hasStorageAccess();
-        if (!has) { // @ts-ignore
-          await document.requestStorageAccess(); location.reload(); return;
+        if (!has) {
+          // @ts-ignore
+          await document.requestStorageAccess();
+          location.reload();
+          return;
         }
       } catch {}
     }
@@ -22,4 +26,18 @@
   });
 </script>
 
-<slot />
+<div class="min-h-screen bg-slate-50 text-slate-900">
+  <header class="border-b bg-white">
+    <div class="mx-auto flex max-w-4xl items-center justify-between px-4 py-3">
+      <a href="{base}/" class="font-semibold">Gradewise</a>
+      <nav class="flex gap-4 text-sm">
+        <a href="{base}/instructor" class="hover:underline">Instructor</a>
+        <a href="{base}/submit/demo-assignment" class="hover:underline">Student demo</a>
+      </nav>
+    </div>
+  </header>
+
+  <main class="mx-auto max-w-4xl px-4 py-6">
+    <slot />
+  </main>
+</div>
