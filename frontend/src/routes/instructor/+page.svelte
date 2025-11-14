@@ -30,7 +30,7 @@
       formData.append("name", assignmentName);
       formData.append("grader", graderFile);
 
-      const res = await fetch(`${PUBLIC_BASE_URL}/api/assignments`, {
+      const res = await fetch(`${PUBLIC_BASE_URL}/v1/assignments`, {
         method: "POST",
         body: formData
       });

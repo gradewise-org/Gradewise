@@ -30,7 +30,7 @@
       formData.append("submission", submissionFile);
 
       const res = await fetch(
-        `${PUBLIC_BASE_URL}/api/assignments/${assignmentId}/submissions`,
+        `${PUBLIC_BASE_URL}/v1/assignments/${assignmentId}/submissions`,
         {
           method: "POST",
           body: formData
@@ -53,7 +53,7 @@
     if (!submissionId) return;
 
     const res = await fetch(
-      `${PUBLIC_BASE_URL}/api/submissions/${submissionId}`
+      `${PUBLIC_BASE_URL}/v1/submissions/${submissionId}`
     );
     if (res.ok) {
       const data = await res.json();
