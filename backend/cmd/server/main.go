@@ -42,7 +42,7 @@ func main() {
 		c.String(http.StatusOK, "Hello, World!")
 	})
 
-	r.GET("/health", func(c *gin.Context) {
+	r.GET("/api/health", func(c *gin.Context) {
 		response := gin.H{
 			"status": "ok",
 			"time":   gin.H{"timestamp": time.Now().Format(time.RFC3339)},
@@ -70,7 +70,7 @@ func main() {
 	})
 
 	// Database connectivity test endpoint
-	r.GET("/db-test", func(c *gin.Context) {
+	r.GET("/api/db-test", func(c *gin.Context) {
 		if db == nil {
 			c.JSON(http.StatusServiceUnavailable, gin.H{
 				"error": "Database not connected",
@@ -106,7 +106,9 @@ func main() {
 	})
 
 	// Register the API handlers
-	api.RegisterHandlers(r, server)
+	api.RegisterHandlersWithOptions(r, server, api.GinServerOptions{
+		BaseURL: "/api",
+	})
 
 	s := &http.Server{
 		Handler: r,
