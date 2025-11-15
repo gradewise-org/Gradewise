@@ -112,6 +112,8 @@ k8s_yaml('k8s/backend/api-backend-deployment.yaml')
 k8s_yaml('k8s/backend/temporal-worker-deployment.yaml')
 k8s_yaml('k8s/frontend/frontend-deployment.yaml')
 k8s_yaml('k8s/lti/lti-deployment.yaml')
+k8s_yaml('k8s/lti/secret.yaml')
+k8s_yaml('k8s/lti/redis.yaml')
 
 # Traefik Ingress Controller
 k8s_yaml('k8s/traefik/crds.yaml')
