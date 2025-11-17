@@ -2,10 +2,20 @@
   import { onMount } from 'svelte';
   import { base } from '$app/paths';
   import '../app.css';
+  import type { LayoutData } from './$types';
+  import {ltiSession} from "../lib/stores/ltiSession";
 
   const COOKIE = '__Host-gw_sid';
   const hasCookie = (n: string) => document.cookie.split('; ').some(c => c.startsWith(n + '='));
 
+
+  export let data: LayoutData;
+
+  // Initialize the ltiSession store from server-side data
+  ltiSession.set({
+      facultyId: data.lti?.facultyId ?? null,
+      user: data.lti?.user ?? {},
+  });
   onMount(async () => {
     if (self !== top && 'hasStorageAccess' in document) {
       try {
@@ -22,6 +32,7 @@
     if (self !== top && !hasCookie(COOKIE)) {
       const ret = encodeURIComponent(location.href);
       top!.location.href = `https://dev.gradewise.org/lti/cookie-init?return=${ret}`;
+      return;
     }
   });
 </script>
@@ -33,6 +44,8 @@
       <nav class="flex gap-4 text-sm">
         <a href="{base}/instructor" class="hover:underline">Instructor</a>
         <a href="{base}/submit/demo-assignment" class="hover:underline">Student demo</a>
+        <a href="{base}/instructor/courses/new" class="hover:underline">New Course</a>
+          <a href="{base}/instructor/courses/list" class="hover:underline">Show Courses</a>
       </nav>
     </div>
   </header>

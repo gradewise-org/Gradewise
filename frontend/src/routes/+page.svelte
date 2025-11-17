@@ -2,11 +2,9 @@
   import { PUBLIC_BASE_URL } from '$env/static/public';
   import type { PageData } from './$types';
   import { onMount } from 'svelte';
-  
-  export let data: PageData;   
+  export let data: PageData;
   let count = 0;               
-  let healthStatus = 'Loading...'; 
-  
+  let healthStatus = 'Loading...';
   onMount(() => {
     const updateHealth = async () => {
       try {
