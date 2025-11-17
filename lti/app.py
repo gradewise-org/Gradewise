@@ -1,5 +1,6 @@
 import os, json
 import secrets
+import requests
 from flask import Flask, request, jsonify, redirect, session, make_response
 from dotenv import load_dotenv
 from pylti1p3.contrib.flask import (
@@ -11,6 +12,7 @@ from werkzeug.middleware.proxy_fix import ProxyFix
 
 
 load_dotenv(".env")
+API_BASE = os.getenv("GRADEWISE_API_BASE", "http://gradewise-api-backend")
 
 # ---- Tool Configuration ----- #
 TENANT_ISS = os.environ.get("CANVAS_ISSUER", "https://ufl.instructure.com")
@@ -71,6 +73,62 @@ app.config.update({
 app_cache = Cache(app)
 launch_store = FlaskCacheDataStorage(app_cache)
 
+def extract_faculty_from_launch(launch_data):
+    # Canvas usually sends these claims; tweak as needed once you inspect launch_data
+    email = launch_data.get("email")
+    if not email:
+        # sometimes under custom/ext claim; you can refine this later
+        ext = launch_data.get("https://purl.imsglobal.org/spec/lti/claim/ext", {})
+        email = ext.get("email")
+
+    full_name = launch_data.get("name")
+    if not full_name:
+        given = launch_data.get("given_name", "")
+        family = launch_data.get("family_name", "")
+        full_name = (given + " " + family).strip() or "Canvas Instructor"
+
+    institution = os.getenv("DEFAULT_INSTITUTION", "UF")
+
+    if not email:
+        raise RuntimeError("LTI launch did not include an email for the user")
+
+    return email, full_name, institution
+
+def ensure_faculty_registered(launch_data):
+    email, full_name, institution = extract_faculty_from_launch(launch_data)
+
+    # The password is just a random secret; instructor never logs in with this directly.
+    password = secrets.token_urlsafe(32)
+
+    payload = {
+        "email": email,
+        "fullName": full_name,
+        "institution": institution,
+        "password": password,
+    }
+
+    url = f"{API_BASE}/api/faculty/register"
+
+    # NOTE: Your Go DevAuth middleware currently requires X-Faculty-ID for all routes.
+    # For this to work, you should EXEMPT /api/faculty/register from DevAuth or mount it
+    # on a router without that middleware. Otherwise this call will 401.
+    try:
+        resp = requests.post(url, json=payload, timeout=5)
+    except Exception as e:
+        app.logger.exception("Failed to call faculty register API")
+        raise RuntimeError(f"Error calling faculty register API: {e}") from e
+
+    if resp.status_code not in (200, 201):
+        app.logger.error("Faculty register failed: %s %s", resp.status_code, resp.text)
+        raise RuntimeError(f"Faculty register failed with status {resp.status_code}")
+
+    data = resp.json()
+    faculty_id = data.get("facultyId")
+    if not faculty_id:
+        raise RuntimeError("Faculty register response missing facultyId")
+
+    return faculty_id
+
 # -- ENDPOINTS -- #
 @app.route("/lti/jwks.json")
 def jwks():
@@ -120,13 +178,40 @@ def launch():
     req = FlaskRequest()
     ml = FlaskMessageLaunch(req, tool_conf, launch_data_storage=launch_store).validate()
 
+    launch_data = ml.get_launch_data()
+    faculty_id = ensure_faculty_registered(launch_data)
+
     # issue your own sid and cache launch data keyed by it
     sid = secrets.token_urlsafe(32)
-    app_cache.set(f"sid:{sid}", ml.get_launch_data(), timeout=3600)
+    session_payload = {
+        "launch": launch_data,
+        "facultyId": faculty_id,
+    }
+    app_cache.set(f"sid:{sid}", session_payload, timeout=3600)
 
+    # 3. Redirect into Svelte app with sid in secure HttpOnly cookie
     resp = make_response(redirect("https://dev.gradewise.org/app"))
     _set_partitioned(resp, COOKIE_NAME, sid, 3600)
     return resp
+
+@app.route("/lti/session", methods=["GET"])
+def lti_session():
+    sid = request.cookies.get(COOKIE_NAME)
+    if not sid:
+        return jsonify({"error": "NO_SID"}), 401
+
+    data = app_cache.get(f"sid:{sid}")
+    if not data:
+        return jsonify({"error": "SESSION_EXPIRED"}), 401
+
+    launch = data.get("launch", {})
+    return jsonify({
+        "facultyId": data.get("facultyId"),
+        "user": {
+            "name": launch.get("name"),
+            "email": launch.get("email"),
+        },
+    })
 
 @app.route("/lti/cookie-init")
 def cookie_init():
