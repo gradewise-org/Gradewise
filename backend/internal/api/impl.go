@@ -12,7 +12,6 @@ import (
 
 	"github.com/gin-gonic/gin"
 	"github.com/google/uuid"
-	"github.com/lib/pq"
 	openapi_types "github.com/oapi-codegen/runtime/types"
 	"go.temporal.io/sdk/client"
 	"golang.org/x/crypto/bcrypt"
@@ -66,13 +65,26 @@ func (s *Server) RegisterFaculty(c *gin.Context) {
 		RETURNING id
 	`, email, string(hash), req.FullName, req.Institution).Scan(&facultyID); err != nil {
 
-		// Map unique violation (email) -> 409 Conflict
-		var pgErr *pq.Error
-		if errors.As(err, &pgErr) && pgErr.Code == "23505" {
-			c.JSON(http.StatusConflict, Error{Code: "EMAIL_EXISTS", Message: "email already registered"})
+		var existingStatus string
+		if err2 := s.DB.QueryRowContext(ctx, `
+				SELECT id, status
+				FROM faculty
+				WHERE email = $1
+			`, email).Scan(&facultyID, &existingStatus); err2 != nil {
+			// If we somehow fail here, treat as server error.
+			c.JSON(http.StatusInternalServerError, Error{
+				Code:    "DB_LOOKUP_ERROR",
+				Message: "email already exists but failed to lookup faculty",
+			})
 			return
 		}
-		c.JSON(http.StatusInternalServerError, Error{Code: "DB_INSERT_ERROR", Message: "failed to create faculty"})
+
+		// Return 200 OK with the existing faculty record
+		c.JSON(http.StatusOK, FacultyRegistrationResponse{
+			FacultyId: facultyID,
+			Email:     openapi_types.Email(email),
+			Status:    FacultyRegistrationResponseStatus(existingStatus),
+		})
 		return
 	}
 
