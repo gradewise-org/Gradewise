@@ -10,7 +10,7 @@
   let submissionId: string | null = null;
   let status: string | null = null;
 
-  $: assignmentId = $page.params.assignmentId;
+  $: assignmentId = $page?.params?.assignmentId ?? "";
 
   function handleFilesSelected(event: CustomEvent<{ files: FileList }>) {
     submissionFile = event.detail.files[0];
