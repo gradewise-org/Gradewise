@@ -15,8 +15,6 @@
 <div class="space-y-6">
     <h1 class="text-2xl font-semibold text-slate-900">My courses</h1>
     <p class="text-sm text-slate-600">
-        These are your courses (using <code>GET /api/courses?mine=true</code>).
-        You can optionally filter by term and course code.
     </p>
 
     {#if data.error}

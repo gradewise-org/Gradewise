@@ -104,7 +104,7 @@
 <div class="space-y-6">
     <h1 class="text-2xl font-semibold text-slate-900">Create a new course</h1>
     <p class="text-sm text-slate-600">
-        Fill in the course details below. This will call <code>POST /api/courses</code> on the backend.
+        Fill in the course details below.
     </p>
 
     {#if successMessage}
@@ -175,7 +175,7 @@
         <div class="grid grid-cols-1 gap-4 sm:grid-cols-2">
             <div>
                 <label class="block text-sm font-medium text-slate-700">
-                    Start date
+                    Start date (optional)
                 </label>
                 <input
                         type="date"
@@ -186,7 +186,7 @@
 
             <div>
                 <label class="block text-sm font-medium text-slate-700">
-                    End date
+                    End date (optional)
                 </label>
                 <input
                         type="date"
