@@ -2,26 +2,14 @@ apiVersion: traefik.io/v1alpha1
 kind: IngressRoute
 metadata:
   name: api-backend-ingress
-
 spec:
-  entryPoints: [web, websecure]
-  tls : {}
+  entryPoints:
+    - web
+    - websecure
   routes:
     - match: PathPrefix(`/api`)
       kind: Rule
-      priority: 100      # beats the root (which has default 0)
+      priority: 100
       services:
         - name: gradewise-api-backend
-          port: web
-      middlewares:
-        - name: strip-api-prefix
----
-apiVersion: traefik.io/v1alpha1
-kind: Middleware
-metadata:
-  name: strip-api-prefix
-
-spec:
-  stripPrefix:
-    prefixes:
-      - /api
+          port: 80

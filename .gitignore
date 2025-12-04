@@ -5,3 +5,4 @@ node_modules
 dist
 *.lockb
 k8s/lti/secret.yaml
+backend/bin

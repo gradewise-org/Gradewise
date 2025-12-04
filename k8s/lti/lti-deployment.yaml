@@ -21,6 +21,8 @@ spec:
               value: "8080"
             - name: REDIS_URL
               value: redis://redis:6379/0
+            - name: GRADEWISE_API_BASE
+              value: http://gradewise-api-backend
             - name: FLASK_SECRET
               valueFrom:
                 secretKeyRef:
